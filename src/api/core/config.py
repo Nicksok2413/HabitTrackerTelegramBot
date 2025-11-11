@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     # --- Настройки, читаемые из .env ---
 
     # Настройки БД
-    DB_NAME: str = Field(..., description="Название базы данных")
-    DB_USER: str = Field(..., description="Имя пользователя базы данных")
+    DB_NAME: str = Field(default="habit_tracker_db", description="Название базы данных")
+    DB_USER: str = Field(default="habit_tracker_user", description="Имя пользователя базы данных")
     DB_PASSWORD: str = Field(..., description="Пароль пользователя базы данных")
     DB_HOST: str = Field(
         default="db",
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     DB_PORT: int = Field(default=5432, description="Порт хоста базы данных")
 
     # Настройки режима разработки/тестирования. В production должно быть False.
-    DEVELOPMENT: bool = Field(..., description="Режим разработки/тестирования")
+    DEVELOPMENT: bool = Field(default=False, description="Режим разработки/тестирования")
 
     # Настройки безопасности
     API_BOT_SHARED_KEY: str = Field(
