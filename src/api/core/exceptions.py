@@ -12,6 +12,15 @@ from pydantic import BaseModel, Field
 
 from .logging import api_log as log
 
+# Словарь для маппинга статус-кодов в семантически верные типы ошибок
+STATUS_CODE_TO_ERROR_TYPE = {
+    status.HTTP_400_BAD_REQUEST: "bad_request",
+    status.HTTP_401_UNAUTHORIZED: "unauthorized",
+    status.HTTP_403_FORBIDDEN: "forbidden",
+    status.HTTP_404_NOT_FOUND: "not_found",
+    status.HTTP_422_UNPROCESSABLE_ENTITY: "validation_error",
+}
+
 
 # --- Структура ответа об ошибке ---
 class ErrorDetail(BaseModel):
@@ -211,31 +220,25 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """
     log.warning(f"HTTPException: {exc.status_code} Detail: '{exc.detail}'. Path: {request.url.path}")
 
-    error_type = "http_error"
+    # Получаем тип ошибки из маппинга, с дефолтным значением "http_error"
+    error_type = STATUS_CODE_TO_ERROR_TYPE.get(exc.status_code, "http_error")
     error_msg = str(exc.detail)
     error_loc: list[str] | None = None  # По умолчанию loc нет для обычных HTTPException
 
-    # Пытаемся угадать тип из статус-кода для более информативного ответа
-    if exc.status_code == status.HTTP_400_BAD_REQUEST:
-        error_type = "bad_request"
-    elif exc.status_code == status.HTTP_401_UNAUTHORIZED:
-        error_type = "unauthorized"
-    elif exc.status_code == status.HTTP_403_FORBIDDEN:
-        error_type = "forbidden"
-    elif exc.status_code == status.HTTP_404_NOT_FOUND:
-        error_type = "not_found"
-    elif exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
-        error_type = "validation_error"
-        # Для ошибок валидации FastAPI (422), exc.detail часто является списком словарей
-        # [{ "loc": ["body", "field"], "msg": "...", "type": "..."}]
-        # Мы можем попытаться извлечь первое сообщение и loc
-        if isinstance(exc.detail, list) and len(exc.detail) > 0 and isinstance(exc.detail[0], dict):
+    # Для ошибок валидации FastAPI (422), exc.detail часто является списком словарей
+    # [{ "loc": ["body", "field"], "msg": "...", "type": "..."}]
+    if exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY and isinstance(exc.detail, list):
+        # Пытаемся извлечь первое сообщение и loc
+        if len(exc.detail) > 0 and isinstance(exc.detail[0], dict):
             first_error = exc.detail[0]
             error_msg = first_error.get("msg", error_msg)
+
             # Преобразуем loc из кортежа/списка чисел/строк в список строк
             raw_loc = first_error.get("loc")
+
             if raw_loc:
                 error_loc = [str(item) for item in raw_loc]
+
         elif isinstance(exc.detail, str):  # Если это простая строка
             error_msg = exc.detail
 
