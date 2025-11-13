@@ -1,0 +1,93 @@
+services:
+  # Сервис Базы данных
+  db:
+    image: postgres:17-alpine
+    container_name: habit_tracker_db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432" # Пробрасываем порт для локального подключения
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
+    healthcheck:
+      # Проверяет, готова ли БД принимать соединения (экранируем $ для shell)
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s  # Даем время на запуск Postgres перед первой проверкой
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Изолированный сервис Базы данных для тестов
+  test-db:
+    image: postgres:17-alpine
+    container_name: habit_tracker_test_db
+    environment:
+      # Используем отдельные переменные для тестов
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432" # Используем другой порт, чтобы не было конфликтов
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Сервис API
+  api:
+    build:
+      context: .  # Контекст сборки - корень проекта
+      dockerfile: Dockerfile.api
+    container_name: habit_tracker_api
+    env_file: .env  # Передаем все переменные из .env в контейнер
+    # Команда для "продакшен" запуска
+    command: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      db:
+        condition: service_healthy  # Запускаем только после того, как db станет healthy
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # --- Заглушки для будущих сервисов ---
+
+  # bot:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.bot
+  #   container_name: habit_tracker_bot
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - api
+  #   restart: unless-stopped
+  #   networks:
+  #     - backend
+
+  # scheduler:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.scheduler
+  #   container_name: habit_tracker_scheduler
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - api
+  #   restart: unless-stopped
+  #   networks:
+  #     - backend
+
+# Определяем все тома для хранения персистентных данных
+volumes:
+  postgres_data:
+    driver: local
+
+# Определяем общую сеть для всех сервисов.
+# Это обеспечивает изоляцию и позволяет контейнерам общаться друг с другом по именам.
+networks:
+  backend:
+    driver: bridge
