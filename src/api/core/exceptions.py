@@ -252,7 +252,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
-async def general_exception_handler(request: Request, exc: Exception):
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
     Обработчик для всех остальных (непредвиденных) исключений.
 
@@ -281,7 +281,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-def setup_exception_handlers(app: FastAPI):
+def setup_exception_handlers(app: FastAPI) -> None:
     """
     Регистрирует обработчики исключений в приложении FastAPI.
 
