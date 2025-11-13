@@ -1,14 +1,12 @@
 services:
   # Сервис Базы данных
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     container_name: habit_tracker_db
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME:-habit_tracker_db}
+      POSTGRES_USER: ${DB_USER:-habit_tracker_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_PORT}:5432" # Пробрасываем порт для локального подключения
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
     healthcheck:
@@ -24,16 +22,21 @@ services:
 
   # Изолированный сервис Базы данных для тестов
   test-db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     container_name: habit_tracker_test_db
     environment:
       # Используем отдельные переменные для тестов
       POSTGRES_DB: test_db
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
-    ports:
-      - "5433:5432" # Используем другой порт, чтобы не было конфликтов
-    restart: unless-stopped
+    # healthcheck для консистентности и надежности тестов
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U test_user -d test_db" ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: no
     networks:
       - backend
 
