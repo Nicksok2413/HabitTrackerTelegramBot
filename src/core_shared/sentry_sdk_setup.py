@@ -1,6 +1,7 @@
 """Настройка Sentry SDK."""
 
 from logging import ERROR, INFO  # Стандартные уровни логирования для Sentry
+from typing import Protocol  # Используем Protocol для определения "контракта" настроек
 
 from sentry_sdk import init as sentry_init
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -8,20 +9,38 @@ from sentry_sdk.integrations.loguru import LoguruIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
-from src.api.core.config import settings
-
 from .logging_setup import setup_logger
 
-# Получаем экземпляр логгера для этого модуля
-sentry_log = setup_logger(service_name="SentrySetup", log_level_override=settings.LOG_LEVEL)
+
+# Определяем протокол, описывающий, какие атрибуты мы ожидаем от объекта настроек
+class SentrySettingsProtocol(Protocol):
+    """Протокол для объекта настроек, используемых Sentry."""
+
+    SENTRY_DSN: str | None
+    PRODUCTION: bool
+    PROJECT_NAME: str
+    API_VERSION: str
 
 
-def setup_sentry():
+# Используем этот протокол в сигнатуре функции инициализации Sentry SDK
+def setup_sentry(settings: SentrySettingsProtocol, log_level: str) -> None:
     """
     Инициализирует Sentry SDK, если задан DSN.
+
     Определяет environment, sample rates и другие параметры на основе settings.
+
+    Args:
+        settings (SentrySettingsProtocol): Объект настроек.
+        log_level (str): Уровень логирования.
     """
+    # Создаем экземпляр логгера для Sentry
+    sentry_log = setup_logger(service_name="SentrySetup", log_level_override=log_level)
+
     sentry_dsn = settings.SENTRY_DSN
+
+    if not sentry_dsn:
+        sentry_log.info("SENTRY_DSN не установлен, Sentry SDK не будет инициализирован.")
+        return
 
     # --- Определяем параметры Sentry ---
 

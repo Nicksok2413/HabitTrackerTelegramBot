@@ -20,9 +20,9 @@ from src.api.core.logging import api_log as log
 from src.api.routes import api_router
 from src.core_shared.sentry_sdk_setup import setup_sentry
 
-# Вызываем инициализацию Sentry, если DSN предоставлен в настройках
+# Вызываем инициализацию Sentry, передавая настройки и уровень логирования
 if settings.SENTRY_DSN:
-    setup_sentry()
+    setup_sentry(settings, log_level=settings.LOG_LEVEL)
 
 
 # Определяем lifespan для управления подключением к БД
