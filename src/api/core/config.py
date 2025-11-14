@@ -42,11 +42,8 @@ class Settings(BaseSettings):
     # URL тестовой БД (используется только в тестах)
     TEST_DATABASE_URL: str = Field(..., description="Асинхронный URL для подключения к тестовой базе данных.")
 
-    # Настройки режима разработки/тестирования. Для продакшен должно быть False.
+    # Настройки режима разработки/тестирования (для продакшен - False)
     DEVELOPMENT: bool = Field(default=False, description="Режим разработки/тестирования")
-
-    # # Считаем режим продакшеном, если не DEVELOPMENT (разработка/тестирование)
-    # PRODUCTION: bool = True if not DEVELOPMENT else False
 
     # Настройки безопасности
     API_BOT_SHARED_KEY: str = Field(..., description="Ключ для аутентификации бота на стороне API")
