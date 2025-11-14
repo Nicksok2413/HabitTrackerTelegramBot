@@ -3,6 +3,7 @@ from typing import AsyncGenerator, Generator
 
 import psycopg
 import pytest
+import pytest_asyncio
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -64,7 +65,7 @@ def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
     command.downgrade(alembic_cfg, "base")
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
     """Создает один асинхронный движок SQLAlchemy для всей сессии."""
     engine = create_async_engine(settings.TEST_DATABASE_URL)
@@ -73,18 +74,24 @@ async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
 
 
 @pytest.fixture(scope="session")
-def async_session_maker(async_engine: AsyncEngine) -> async_sessionmaker:
-    """Создает одну фабрику сессий для всей тестовой сессии."""
-    return async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+def db_session_factory(async_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    """Создает фабрику асинхронных сессий для всей тестовой сессии."""
+    return async_sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@pytest.fixture(scope="function")
-async def db_session(async_session_maker: async_sessionmaker) -> AsyncGenerator[AsyncSession, None]:
+@pytest_asyncio.fixture(scope="function")
+async def db_session(db_session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
     """
     Предоставляет изолированную транзакцию в БД для каждого теста.
     Эта фикстура может быть использована тестами API, планировщика и т.д.
     """
-    async with async_session_maker() as session:
+    # Создаем сессию из фабрики
+    async with db_session_factory() as session:
+        # Начинаем транзакцию
         await session.begin()
-        yield session
-        await session.rollback()
+        try:
+            # Передаем управление в тестовую функцию
+            yield session
+        finally:
+            # Гарантированно откатываем транзакцию после завершения теста, даже если в нем произошла ошибка
+            await session.rollback()
