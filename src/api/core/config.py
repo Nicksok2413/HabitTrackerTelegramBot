@@ -36,14 +36,20 @@ class Settings(BaseSettings):
     )
     DB_PORT: int = Field(default=5432, description="Порт хоста базы данных")
 
-    # Настройки режима разработки/тестирования. В production должно быть False.
+    # URL основной БД
+    DATABASE_URL: str = Field(..., description="Асинхронный URL для подключения к основной базе данных.")
+
+    # URL тестовой БД (используется только в тестах)
+    TEST_DATABASE_URL: str = Field(..., description="Асинхронный URL для подключения к тестовой базе данных.")
+
+    # Настройки режима разработки/тестирования. Для продакшен должно быть False.
     DEVELOPMENT: bool = Field(default=False, description="Режим разработки/тестирования")
 
+    # # Считаем режим продакшеном, если не DEVELOPMENT (разработка/тестирование)
+    # PRODUCTION: bool = True if not DEVELOPMENT else False
+
     # Настройки безопасности
-    API_BOT_SHARED_KEY: str = Field(
-        ...,
-        description="Ключ для аутентификации бота на стороне API",
-    )
+    API_BOT_SHARED_KEY: str = Field(..., description="Ключ для аутентификации бота на стороне API")
     BOT_TOKEN: str = Field(..., description="Токен бота")
     JWT_SECRET_KEY: str = Field(..., description="JWT")
 
@@ -67,21 +73,8 @@ class Settings(BaseSettings):
     # Продакшен режим
     @computed_field
     def PRODUCTION(self) -> bool:
-        # Считаем продакшеном, если не DEVELOPMENT
+        # Считаем режим продакшеном, если не DEVELOPMENT (разработка/тестирование)
         return not self.DEVELOPMENT
-
-    # Формируем URL БД
-    @computed_field(repr=False)
-    def DATABASE_URL(self) -> str:
-        """URL для БД основной или тестовой."""
-        if self.DEVELOPMENT:
-            # Используем SQLite in-memory для тестов
-            # Чтобы одна и та же БД использовалась в рамках сессии pytest добавляем "?cache=shared" и "&uri=true"
-            return "sqlite+aiosqlite:///:memory:?cache=shared&uri=true"
-        else:
-            return (
-                f"postgresql+psycopg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-            )
 
     model_config = SettingsConfigDict(
         env_file=".env",
