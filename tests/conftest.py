@@ -5,8 +5,7 @@ import psycopg
 import pytest
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from alembic import command
 from src.api.core.config import settings
@@ -66,7 +65,7 @@ def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session")
-async def async_engine() -> AsyncGenerator[create_async_engine, None]:
+async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
     """Создает один асинхронный движок SQLAlchemy для всей сессии."""
     engine = create_async_engine(settings.TEST_DATABASE_URL)
     yield engine
@@ -74,18 +73,18 @@ async def async_engine() -> AsyncGenerator[create_async_engine, None]:
 
 
 @pytest.fixture(scope="session")
-def session_maker(async_engine: create_async_engine) -> sessionmaker:
+def async_session_maker(async_engine: AsyncEngine) -> async_sessionmaker:
     """Создает одну фабрику сессий для всей тестовой сессии."""
-    return sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    return async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @pytest.fixture(scope="function")
-async def db_session(session_maker: sessionmaker) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(async_session_maker: async_sessionmaker) -> AsyncGenerator[AsyncSession, None]:
     """
     Предоставляет изолированную транзакцию в БД для каждого теста.
     Эта фикстура может быть использована тестами API, планировщика и т.д.
     """
-    async with session_maker() as session:
+    async with async_session_maker() as session:
         await session.begin()
         yield session
         await session.rollback()

@@ -15,12 +15,12 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
     """
     Создает и предоставляет тестовый клиент FastAPI для каждого API-теста.
 
-    Зависит от фикстуры `db_session` (которую pytest найдет в корневом conftest.py)
+    Зависит от фикстуры `db_session` (в корневом conftest.py)
     для переопределения зависимости и обеспечения изоляции транзакций.
     """
 
     # Функция для переопределения зависимости `get_db_session` в приложении
-    def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
     # Применяем переопределение
