@@ -2,21 +2,24 @@ import asyncio
 from typing import AsyncGenerator, Generator
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from httpx import AsyncClient
+from pytest_docker.plugin import Services as DockerServices
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from pytest_docker import DockerCompose
-from sqlalchemy import text
-from alembic.config import Config
-from alembic import command
+
+from src.api.core.config import settings
+
 
 # --- Настройки ---
-# Путь к docker-compose файлу, который будет использоваться для тестов.
+# Путь к docker compose файлу, который будет использоваться для тестов
 DOCKER_COMPOSE_FILE = "docker-compose.yml"
 # Указываем, что нужно использовать только сервис test-db
 TEST_DB_SERVICE_NAME = "test-db"
 # URL для тестовой Базы данных
-TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
+TEST_DATABASE_URL = settings.TEST_DATABASE_URL
 
 
 # --- Фикстуры ---
@@ -28,34 +31,43 @@ def event_loop() -> Generator:
     yield loop
     loop.close()
 
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    """Фикстура, возвращающая путь к docker-compose.yml файлу."""
+    return "docker-compose.yml"
+
+
+# Вспомогательная функция для проверки доступности Postgres
+def is_postgres_responsive(db_url: str) -> bool:
+    """Синхронно проверяет, отвечает ли база данных."""
+
+    import psycopg
+
+    try:
+        # psycopg3 может работать и в синхронном режиме
+        conn = psycopg.connect(db_url.replace("+psycopg", ""), timeout=1)
+        conn.close()
+        return True
+    except psycopg.OperationalError:
+        return False
+
 
 @pytest.fixture(scope="session")
-async def postgres_service(docker_compose: DockerCompose) -> AsyncGenerator:
+async def postgres_service(docker_compose_file: str, docker_services: DockerServices) -> None:
     """
     Фикстура для запуска и ожидания готовности сервиса test-db.
-    `docker_compose` - фикстура из pytest-docker.
+    `docker_services` - фикстура из pytest-docker.
     """
-    engine = create_async_engine(TEST_DATABASE_URL)
-    # Ожидаем, пока БД станет доступна
-    # `docker_compose.read_logs` используется для ожидания
-    docker_compose.execute(f"up -d {TEST_DB_SERVICE_NAME}")
+    # Запускаем сервисы, определенные в docker-compose файле
+    # pytest-docker сам найдет и поднимет их.
 
-    for _ in range(30):  # Попытки подключения в течение 30 секунд
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            print("✅ База данных для тестов готова.")
-            break
-        except Exception:
-            await asyncio.sleep(1)
-    else:
-        pytest.fail("❌ Не удалось подключиться к тестовой базе данных.")
-
-    yield
-
-    # Останавливаем контейнер после тестов
-    docker_compose.execute(f"down")
-    await engine.dispose()
+    # Теперь нужно дождаться, пока порт станет доступен
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=1.0,
+        check=lambda: is_postgres_responsive(settings.TEST_DATABASE_URL)
+    )
+    print("✅ База данных для тестов готова.")
 
 
 @pytest.fixture(scope="session", autouse=True)
