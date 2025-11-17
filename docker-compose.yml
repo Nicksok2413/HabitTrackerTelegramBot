@@ -47,10 +47,10 @@ services:
       dockerfile: docker/api/Dockerfile  # Путь к Dockerfile для API
     container_name: habit_tracker_api
     env_file: .env  # Передаем все переменные из .env в контейнер
-    # Команда для "продакшен" запуска
+    # Команда для "продакшен" запуска (будет передана в entrypoint как "$@")
     command: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
     volumes:
-      - log_data:/app/logs  # Монтируем том для логов
+      - api_logs:/logs  # Монтируем том для логов
     depends_on:
       db:
         condition: service_healthy  # Запускаем только после того, как db станет healthy
@@ -68,7 +68,7 @@ services:
   #   env_file:
   #     - .env
   #   volumes:
-  #     - log_data:/app/logs  # Монтируем том для логов
+  #     - bot_logs:/logs  # Монтируем том для логов
   #   depends_on:
   #     - api
   #   restart: unless-stopped
@@ -83,7 +83,7 @@ services:
   #   env_file:
   #     - .env
   #   volumes:
-  #     - log_data:/app/logs  # Монтируем том для логов
+  #     - scheduler_logs:/logs  # Монтируем том для логов
   #   depends_on:
   #     - api
   #   restart: unless-stopped
@@ -93,6 +93,8 @@ services:
 # Определяем все тома для хранения персистентных данных
 volumes:
   postgres_data:
+    driver: local
+  api_logs:
     driver: local
 
 # Определяем общую сеть для всех сервисов.
