@@ -1,16 +1,13 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
-
 from alembic import context
-
-# # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
-# from src.api.models import habit, habit_execution, user # type: ignore
-# Импортируем настройки API для получения URL базы данных
-from src.api.core.config import settings
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models.base import Base
+# # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
+# from src.api.models import habit, habit_execution, user # type: ignore
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -21,11 +18,34 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Устанавливаем значение URL базы данных
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
 # Указываем Alembic на метаданные базовой модели
 target_metadata = Base.metadata
+
+# Функция для формирования URL базы данных
+def get_database_url() -> str:
+    """
+    Читает переменные окружения и формирует URL для базы данных.
+
+    Raises:
+        ValueError, если одна или несколько переменных окружения отсутствуют.
+    """
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT")
+    db_name = os.getenv("DB_NAME")
+
+    # Проверка, что все переменные установлены
+    if not all([db_user, db_password, db_host, db_port, db_name]):
+        raise ValueError("Одна или несколько переменных для подключения к БД отсутствуют.")
+
+    return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+# Формируем URL базы данных
+db_url = get_database_url()
+
+# Устанавливаем значение URL базы данных
+config.set_main_option("sqlalchemy.url", db_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
