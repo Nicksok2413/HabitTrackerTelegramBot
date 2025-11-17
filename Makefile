@@ -1,0 +1,56 @@
+# Makefile - Единая точка входа для управления проектом
+
+# .PHONY гарантирует, что make не будет путать эти команды с именами файлов
+.PHONY: help up down logs migrate revision
+
+# Команда по умолчанию, которая будет вызвана при запуске `make`
+default: help
+
+help:
+	@echo "Доступные команды:"
+	@echo "  up        - Запустить все сервисы в фоновом режиме"
+	@echo "  down      - Остановить все сервисы"
+	@echo "  rebuild   - Пересобрать образы и запустить сервисы"
+	@echo "  prune     - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
+	@echo "  logs      - Показать логи всех сервисов"
+	@echo "  migrate   - Применить миграции Alembic"
+	@echo "  revision  - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+rebuild: down
+	@echo "-> Пересборка и запуск сервисов..."
+	docker compose up -d --build
+	@echo "-> Сервисы успешно пересобраны и запущены."
+
+prune:
+	@echo "ВНИМАНИЕ: Эта команда остановит контейнеры и УДАЛИТ ВСЕ ДАННЫЕ В ТОМАХ (volumes)."
+	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		echo "-> Начинаем полную очистку..."; \
+		docker compose down -v; \
+		echo "-> Окружение полностью очищено."; \
+	else \
+		echo "-> Очистка отменена."; \
+	fi
+
+logs:
+	docker compose logs -f
+
+migrate:
+	@echo "-> Применение миграций Alembic..."
+	# Запускаем временный контейнер api-migrate
+	docker compose run --rm api-migrate
+	@echo "-> Миграции успешно применены."
+
+revision:
+	# Проверяем, что передано сообщение для миграции
+	@if [ -z "$(m)" ]; then \
+		echo "Ошибка: необходимо указаться сообщение для миграции. Пример: make revision m=\"Your message\""; \
+		exit 1; \
+	fi
+	docker compose run --rm api alembic revision --autogenerate -m "$(m)"
