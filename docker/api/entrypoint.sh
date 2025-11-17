@@ -17,13 +17,21 @@ import psycopg
 import sys
 import time
 
+db_url = (
+    f"dbname={os.environ['DB_NAME']} "
+    f"user={os.environ['DB_USER']} "
+    f"password={os.environ['DB_PASSWORD']} "
+    f"host={os.environ['DB_HOST']} "
+    f"port={os.environ['DB_PORT']}"
+)
+
 try:
     conn = None
     print("Попытка подключения к БД...")
 
     for attempt in range(30):
         try:
-            conn = psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=2)
+            conn = psycopg.connect(db_url, connect_timeout=2)
             print(f"   Попытка {attempt+1}/30: PostgreSQL запущен - соединение установлено.")
             break
         except psycopg.OperationalError as exc:
