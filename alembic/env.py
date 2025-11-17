@@ -41,11 +41,16 @@ def get_database_url() -> str:
 
     return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-# Формируем URL базы данных
-db_url = get_database_url()
+# Сначала пытаемся получить URL из уже существующей конфигурации
+# (это позволяет тестам в conftest.py переопределять его)
+db_url = config.get_main_option("sqlalchemy.url")
 
-# Устанавливаем значение URL базы данных
-config.set_main_option("sqlalchemy.url", db_url)
+# Если URL не был установлен извне, формируем его из переменных окружения
+if db_url is None:
+    # Формируем URL базы данных
+    db_url = get_database_url()
+    # Устанавливаем значение URL базы данных
+    config.set_main_option("sqlalchemy.url", db_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
