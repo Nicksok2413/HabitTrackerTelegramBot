@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     # Срок годности JWT токена в минутах
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # URL тестовой БД (используется только в тестах)
+    TEST_DATABASE_URL: str = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
 
     # --- Настройки, читаемые из .env ---
 
@@ -35,12 +37,6 @@ class Settings(BaseSettings):
         description="Имя хоста базы данных (название сервиса в Docker)",
     )
     DB_PORT: int = Field(default=5432, description="Порт хоста базы данных")
-
-    # URL основной БД
-    DATABASE_URL: str = Field(..., description="Асинхронный URL для подключения к основной базе данных.")
-
-    # URL тестовой БД (используется только в тестах)
-    TEST_DATABASE_URL: str = Field(..., description="Асинхронный URL для подключения к тестовой базе данных.")
 
     # Настройки режима разработки/тестирования (для продакшен - False)
     DEVELOPMENT: bool = Field(default=False, description="Режим разработки/тестирования")
@@ -72,6 +68,12 @@ class Settings(BaseSettings):
     def PRODUCTION(self) -> bool:
         # Считаем режим продакшеном, если не DEVELOPMENT (разработка/тестирование)
         return not self.DEVELOPMENT
+
+    # Формируем URL основной базы данных
+    @computed_field(repr=False)
+    def DATABASE_URL(self) -> str:
+        """URL для основной БД."""
+        return f"postgresql+psycopg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
         env_file=".env",
