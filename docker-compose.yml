@@ -44,11 +44,13 @@ services:
   api:
     build:
       context: .  # Контекст сборки - корень проекта
-      dockerfile: Dockerfile.api
+      dockerfile: docker/api/Dockerfile  # Путь к Dockerfile для API
     container_name: habit_tracker_api
     env_file: .env  # Передаем все переменные из .env в контейнер
     # Команда для "продакшен" запуска
     command: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - log_data:/app/logs  # Монтируем том для логов
     depends_on:
       db:
         condition: service_healthy  # Запускаем только после того, как db станет healthy
@@ -60,11 +62,13 @@ services:
 
   # bot:
   #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.bot
+  #     context: .  # Контекст сборки - корень проекта
+  #     dockerfile: docker/bot/Dockerfile  # Путь к Dockerfile для Телеграм-бота
   #   container_name: habit_tracker_bot
   #   env_file:
   #     - .env
+  #   volumes:
+  #     - log_data:/app/logs  # Монтируем том для логов
   #   depends_on:
   #     - api
   #   restart: unless-stopped
@@ -73,11 +77,13 @@ services:
 
   # scheduler:
   #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.scheduler
+  #     context: .  # Контекст сборки - корень проекта
+  #     dockerfile: docker/scheduler/Dockerfile  # Путь к Dockerfile для Планировщика
   #   container_name: habit_tracker_scheduler
   #   env_file:
   #     - .env
+  #   volumes:
+  #     - log_data:/app/logs  # Монтируем том для логов
   #   depends_on:
   #     - api
   #   restart: unless-stopped
