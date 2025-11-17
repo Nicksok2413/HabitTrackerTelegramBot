@@ -27,7 +27,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pre-commit (>=4.4.0,<5.0.0)",
-    "ruff (>=0.14.4,<0.15.0)",
+    "ruff (>=0.14.5,<0.15.0)",
     "mypy (>=1.18.2,<2.0.0)",
     "pytest (>=9.0.1,<10.0.0)",
     "pytest-docker (>=3.2.5,<4.0.0)",
@@ -94,7 +94,9 @@ line-length = 120
 # Настраиваем линтер ('ruff check')
 [tool.ruff.lint]
 # Выбираем наборы правил.
-# 'E' и 'F' - это стандарт (pycodestyle, pyflakes)
+# 'E' - ошибки стиля PEP 8 (pycodestyle / Flake8 E-rules)
+# 'F' - потенциальные ошибки (Pyflakes / Flake8 F-rules)
+# 'w' - предупреждения о потенциальных проблемах (pycodestyle / Flake8 W-rules)
 # 'I' - для сортировки импортов (isort)
 select = ["E", "F", "W", "I"]
 
