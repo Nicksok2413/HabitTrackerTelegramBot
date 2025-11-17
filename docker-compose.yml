@@ -1,3 +1,17 @@
+# Определяем "шаблон" для API-сервисов с помощью якоря
+x-api-base: &api-base-config
+  build:
+    context: .  # Контекст сборки - корень проекта
+    dockerfile: docker/api/Dockerfile  # Путь к Dockerfile для API
+  env_file: .env  # Передаем все переменные из .env в контейнер
+  volumes:
+    - api_logs:/logs  # Монтируем том для логов
+  depends_on:
+    db:
+      condition: service_healthy  # Запускаем только после того, как db станет healthy
+  networks:
+    - backend
+
 services:
   # Сервис Базы данных
   db:
@@ -36,27 +50,25 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-    restart: no
+    restart: "no"
     networks:
       - backend
 
   # Сервис API
   api:
-    build:
-      context: .  # Контекст сборки - корень проекта
-      dockerfile: docker/api/Dockerfile  # Путь к Dockerfile для API
+    <<: *api-base-config
     container_name: habit_tracker_api
-    env_file: .env  # Передаем все переменные из .env в контейнер
     # Команда для "продакшен" запуска (будет передана в entrypoint как "$@")
     command: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-    volumes:
-      - api_logs:/logs  # Монтируем том для логов
-    depends_on:
-      db:
-        condition: service_healthy  # Запускаем только после того, как db станет healthy
     restart: unless-stopped
-    networks:
-      - backend
+
+  # Сервис миграций
+  api-migrate:
+    <<: *api-base-config
+    # Команда для выполнения миграций (будет передана в entrypoint как "$@")
+    command: alembic upgrade head
+    restart: "no"
+
 
   # --- Заглушки для будущих сервисов ---
 
@@ -96,6 +108,10 @@ volumes:
     driver: local
   api_logs:
     driver: local
+#  bot_logs:
+#    driver: local
+#  scheduler_logs:
+#    driver: local
 
 # Определяем общую сеть для всех сервисов.
 # Это обеспечивает изоляцию и позволяет контейнерам общаться друг с другом по именам.
