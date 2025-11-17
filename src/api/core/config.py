@@ -23,8 +23,6 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     # Срок годности JWT токена в минутах
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    # URL тестовой БД (используется только в тестах)
-    TEST_DATABASE_URL: str = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
 
     # --- Настройки, читаемые из .env ---
 
@@ -72,7 +70,7 @@ class Settings(BaseSettings):
     # Формируем URL основной базы данных
     @computed_field(repr=False)
     def DATABASE_URL(self) -> str:
-        """URL для основной БД."""
+        """Собирает URL для SQLAlchemy."""
         return f"postgresql+psycopg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
