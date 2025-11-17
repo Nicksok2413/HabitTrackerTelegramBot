@@ -3,10 +3,8 @@ from starlette import status
 
 
 async def test_health_check_returns_ok(test_client: AsyncClient):
-    """
-    Проверяет, что эндпоинт /healthcheck возвращает 200 OK
-    и сообщает о доступности базы данных.
-    """
+    """Проверяет, что эндпоинт /healthcheck возвращает 200 OK и сообщает о доступности базы данных."""
+
     # Arrange
     url = "/healthcheck"
 
