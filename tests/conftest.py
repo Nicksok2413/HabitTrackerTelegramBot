@@ -9,7 +9,10 @@ from pytest_docker.plugin import Services as DockerServices
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from alembic import command
-from src.api.core.config import settings
+
+# URL тестовой БД
+TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
+
 
 # --- ГЛОБАЛЬНЫЕ ФИКСТУРЫ ДЛЯ ВСЕГО ПРОЕКТА ---
 
@@ -45,7 +48,7 @@ def postgres_service(docker_compose_file: str, docker_services: DockerServices) 
     docker_services.wait_until_responsive(
         timeout=30.0,
         pause=1.0,
-        check=lambda: is_postgres_responsive(settings.TEST_DATABASE_URL),
+        check=lambda: is_postgres_responsive(TEST_DATABASE_URL),
     )
     print("✅ База данных для тестов готова.")
 
@@ -56,7 +59,7 @@ def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
     Применяет и откатывает Alembic миграции для всей тестовой сессии.
     """
     alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.TEST_DATABASE_URL)
+    alembic_cfg.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
 
     print("\n⬆️  Применение миграций Alembic...")
     command.upgrade(alembic_cfg, "head")
@@ -68,7 +71,7 @@ def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
 @pytest_asyncio.fixture(scope="session")
 async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
     """Создает один асинхронный движок SQLAlchemy для всей сессии."""
-    engine = create_async_engine(settings.TEST_DATABASE_URL)
+    engine = create_async_engine(TEST_DATABASE_URL)
     yield engine
     await engine.dispose()
 
