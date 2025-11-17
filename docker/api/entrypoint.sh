@@ -17,21 +17,22 @@ import psycopg
 import sys
 import time
 
-db_url = (
-    f"dbname={os.environ['DB_NAME']} "
-    f"user={os.environ['DB_USER']} "
-    f"password={os.environ['DB_PASSWORD']} "
-    f"host={os.environ['DB_HOST']} "
-    f"port={os.environ['DB_PORT']}"
-)
-
 try:
+    # Безопасно формируем строку подключения, , которая корректно экранирует спецсимволы
+    conn_str = psycopg.conninfo.make_conninfo(
+        dbname=os.environ.get("DB_NAME"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("DB_PASSWORD"),
+        host=os.environ.get("DB_HOST"),
+        port=os.environ.get("DB_PORT"),
+    )
+
     conn = None
     print("Попытка подключения к БД...")
 
     for attempt in range(30):
         try:
-            conn = psycopg.connect(db_url, connect_timeout=2)
+            conn = psycopg.connect(conn_str, connect_timeout=2)
             print(f"   Попытка {attempt+1}/30: PostgreSQL запущен - соединение установлено.")
             break
         except psycopg.OperationalError as exc:
