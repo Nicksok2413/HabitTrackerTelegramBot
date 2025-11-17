@@ -44,7 +44,7 @@ RUN poetry install --no-dev --no-root
 # Этап 2: "runner" - Финальный, чистый образ для запуска приложения
 # =================================================================
 # Используем легковесный образ Python
-FROM python:3.12-slim as runner
+FROM python:3.12-slim
 
 # Стандартные переменные окружения для Python в Docker
 # Весь вывод (print, логи) будет сразу отправляться в консоль Docker
@@ -81,7 +81,8 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-creat
 # Меняем владельца рабочей директории на appuser
 RUN chown appuser:appgroup /app
 
-# Копируем весь код приложения, сразу устанавливая правильного владельца
+# Копируем код, нужный для API и миграций, сразу устанавливая правильного владельца
+COPY --chown=appuser:appgroup ./alembic ./alembic
 COPY --chown=appuser:appgroup ./src/api ./src/api
 COPY --chown=appuser:appgroup ./src/core_shared ./src/core_shared
 
