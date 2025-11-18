@@ -10,26 +10,28 @@ help:
 	@echo "Доступные команды:"
 	@echo ""
 	@echo "Установка зависимостей:"
-	@echo "  install   - Установить Python зависимости"
+	@echo "  install        - Установить Python зависимости"
 	@echo ""
 	@echo "Управление Docker окружением:"
-	@echo "  up        - Запустить все сервисы в фоновом режиме"
-	@echo "  down      - Остановить все сервисы"
-	@echo "  rebuild   - Пересобрать образы и запустить сервисы"
-	@echo "  prune     - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
-	@echo "  logs      - Показать логи всех сервисов"
+	@echo "  up             - Запустить все сервисы в фоновом режиме"
+	@echo "  down           - Остановить все сервисы"
+	@echo "  rebuild        - Пересобрать образы и запустить сервисы"
+	@echo "  prune          - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
+	@echo "  logs           - Показать логи всех сервисов"
 	@echo ""
 	@echo "Управление миграциями базы данных:"
-	@echo "  migrate   - Применить миграции Alembic"
-	@echo "  revision  - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
+	@echo "  migrate        - Применить миграции Alembic"
+	@echo "  revision       - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
 	@echo ""
 	@echo "Проверка качества кода и тесты:"
-	@echo "  lint      - Проверить код линтером Ruff"
-	@echo "  format    - Отформатировать код с помощью Ruff"
-	@echo "  types     - Проверить статическую типизацию mypy"
-	@echo "  test      - Запустить тесты pytest"
-	@echo "  test-cov  - Запустить тесты pytest с отчетом о покрытии кода"
-	@echo "  check     - Запустить все проверки (lint, format, types, test) последовательно"
+	@echo "  lint           - Проверить код линтером Ruff"
+	@echo "  lint-fix       - Исправить код линтером Ruff"
+	@echo "  format-check   - Проверить код форматтером Ruff"
+	@echo "  format         - Отформатировать код форматтером Ruff"
+	@echo "  types          - Проверить статическую типизацию mypy"
+	@echo "  test           - Запустить тесты pytest"
+	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
+	@echo "  check          - Запустить все проверки (lint, format, types, test) последовательно"
 
 # ------------------------------------------------------------------------------
 # Установка зависимостей
@@ -79,7 +81,7 @@ migrate:
 revision:
 	# Проверяем, что передано сообщение для миграции
 	@if [ -z "$(m)" ]; then \
-		echo "Ошибка: необходимо указаться сообщение для миграции. Пример: make revision m=\"Your message\""; \
+		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
 		exit 1; \
 	fi
 	docker compose run --rm api alembic revision --autogenerate -m "$(m)"
@@ -89,15 +91,23 @@ revision:
 # ------------------------------------------------------------------------------
 lint:
 	@echo "-> Проверка кода с помощью Ruff linter..."
-	ruff check .
+	ruff check src/
+
+lint-fix:
+	@echo "-> Исправление кода с помощью Ruff linter..."
+	ruff check src/ --fix
+
+format-check:
+	@echo "-> Форматирование кода с помощью Ruff formatter..."
+	ruff format src/ --check
 
 format:
 	@echo "-> Форматирование кода с помощью Ruff formatter..."
-	ruff format .
+	ruff format src/
 
 types:
 	@echo "-> Статическая проверка типов с помощью mypy..."
-	mypy .
+	mypy --package src.api --package src.core_shared
 
 test:
 	@echo "-> Запуск тестов pytest..."

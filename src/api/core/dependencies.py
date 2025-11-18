@@ -5,13 +5,10 @@ from typing import Annotated
 from fastapi import Depends, Security
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.models import Habit, HabitExecution, User
-from src.api.repositories import (
-    HabitExecutionRepository,
-    HabitRepository,
-    UserRepository,
-)
-from src.api.services import HabitExecutionService, HabitService, UserService
+from src.api.repositories import HabitExecutionRepository, HabitRepository, UserRepository  # noqa
+from src.api.services import HabitExecutionService, HabitService, UserService  # noqa
+
+from src.api.models import Habit, HabitExecution, User  # type: ignore
 
 from .config import settings
 from .database import get_db_session

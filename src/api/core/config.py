@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     # --- Вычисляемые поля ---
 
     # Продакшен режим
-    @computed_field
+    @property
     def PRODUCTION(self) -> bool:
         # Считаем режим продакшеном, если не DEVELOPMENT (разработка/тестирование)
         return not self.DEVELOPMENT

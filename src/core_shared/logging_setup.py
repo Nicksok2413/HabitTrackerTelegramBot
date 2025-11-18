@@ -3,6 +3,7 @@
 import os
 import sys
 
+import loguru
 from loguru import logger as global_loguru_logger
 from pydantic import BaseModel, Field
 
@@ -34,7 +35,7 @@ def setup_logger(
     service_name: str,
     log_config: LogConfig | None = None,
     log_level_override: str | None = None,
-) -> global_loguru_logger.__class__:
+) -> loguru.Logger:
     """
     Настраивает Loguru логгер для указанного сервиса и возвращает его экземпляр.
 

@@ -40,7 +40,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     log.debug(f"Создание JWT токена с payload: {to_encode} и временем истечения: {expire.isoformat()}")
 
     try:
-        encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+        encoded_jwt: str = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     except Exception as exc:
         log.error(f"Ошибка при кодировании JWT: {exc}", exc_info=True)
         # В реальном приложении здесь может быть более специфическая обработка или re-raise

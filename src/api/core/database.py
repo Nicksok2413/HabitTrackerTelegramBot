@@ -1,7 +1,7 @@
 """Настройка подключения к базе данных с использованием SQLAlchemy."""
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -25,12 +25,12 @@ class Database:
     - Создание сессий
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Инициализирует менеджер с пустыми подключениями."""
         self.engine: AsyncEngine | None = None
         self.session_factory: async_sessionmaker[AsyncSession] | None = None
 
-    async def connect(self, **kwargs):
+    async def connect(self, **kwargs: Any) -> None:
         """
         Устанавливает подключение к базе данных.
 
@@ -43,7 +43,7 @@ class Database:
             RuntimeError: При неудачной проверке подключения.
         """
         self.engine = create_async_engine(
-            settings.DATABASE_URL,
+            str(settings.DATABASE_URL),
             echo=settings.DEVELOPMENT,  # Включаем логирование SQL запросов в режиме DEVELOPMENT
             pool_pre_ping=True,  # Проверять соединение перед использованием
             pool_recycle=3600,  # Переподключение каждый час
@@ -61,7 +61,7 @@ class Database:
         await self._verify_connection()
         log.success("Подключение к базе данных установлено.")
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Корректное закрытие подключения к базе данных."""
         if self.engine:
             log.info("Закрытие подключения к базе данных...")
@@ -70,7 +70,7 @@ class Database:
             self.session_factory = None
             log.info("Подключение к базе данных успешно закрыто.")
 
-    async def _verify_connection(self):
+    async def _verify_connection(self) -> None:
         """
         Проверяет работоспособность подключения к базе данных.
 

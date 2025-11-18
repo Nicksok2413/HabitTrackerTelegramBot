@@ -9,7 +9,7 @@ from sentry_sdk.integrations.loguru import LoguruIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
-from .logging_setup import setup_logger
+from src.core_shared.logging_setup import setup_logger
 
 
 # Определяем протокол, описывающий, какие атрибуты мы ожидаем от объекта настроек
@@ -17,9 +17,11 @@ class SentrySettingsProtocol(Protocol):
     """Протокол для объекта настроек, используемых Sentry."""
 
     SENTRY_DSN: str | None
-    PRODUCTION: bool
     PROJECT_NAME: str
     API_VERSION: str
+
+    @property
+    def PRODUCTION(self) -> bool: ...
 
 
 # Используем этот протокол в сигнатуре функции инициализации Sentry SDK

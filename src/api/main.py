@@ -8,6 +8,7 @@
 """
 
 from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, Response, status
 from sqlalchemy import text
@@ -27,7 +28,7 @@ if settings.SENTRY_DSN:
 
 # Определяем lifespan для управления подключением к БД
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # pragma: no cover
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # pragma: no cover
     """
     Контекстный менеджер для управления жизненным циклом приложения.
 
@@ -99,7 +100,7 @@ app = create_app()
 async def health_check(
     response: Response,
     db_session: DBSession,
-):
+) -> dict[str, Any]:
     """
     Эндпоинт для проверки работоспособности сервиса.
 
