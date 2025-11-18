@@ -28,13 +28,28 @@ jobs:
         with:
           version: "latest"
 
-      # 3. Устанавливаем зависимости проекта с кэшированием
+      # 3. Настраиваем кэширование виртуального окружения
+      - name: Cache poetry virtual environment
+        uses: actions/cache@v4
+        id: cached-dependencies  # Даем ID этому шагу, чтобы ссылаться на него
+        with:
+          # Путь к директории, которую нужно кэшировать
+          path: .venv
+          # Ключ кэша: он будет уникальным для комбинации ОС, версии Python и содержимого poetry.lock
+          key: ${{ runner.os }}-python-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          # Ключи для восстановления, если точного совпадения нет
+          restore-keys: |
+            ${{ runner.os }}-python-${{ matrix.python-version }}-
+
+      # 4. Устанавливаем зависимости
       - name: Install dependencies
-        run: poetry install
+        # Запускаем этот шаг, только если кэш не был найден
+        if: steps.cached-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-root
         env:
           POETRY_VIRTUALENVS_IN_PROJECT: true  # Создаем .venv в корне проекта для кэширования
 
-      # 4. Запускаем все проверки качества кода и тесты через Makefile
+      # 5. Запускаем все проверки качества кода и тесты через Makefile
       #    Тесты будут использовать сервис test-db из docker-compose.yml
       - name: Run quality checks and tests
         run: make check
