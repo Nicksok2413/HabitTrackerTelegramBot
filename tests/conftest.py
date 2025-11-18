@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from alembic import command
 
-# URL тестовой БД
+# URL тестовой базы данных
 TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
 
 
@@ -56,9 +56,13 @@ def postgres_service(docker_compose_file: str, docker_services: DockerServices) 
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
     """
-    Применяет и откатывает Alembic миграции для всей тестовой сессии.
+    Создает конфигурацию Alembic, применяет и откатывает миграции.
     """
-    alembic_cfg = Config("alembic.ini")
+    # Создаем объект Config
+    alembic_cfg = Config()
+    # Устанавливаем путь к скриптам
+    alembic_cfg.set_main_option("script_location", "alembic")
+    # Устанавливаем URL тестовой базы данных
     alembic_cfg.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
 
     print("\n⬆️  Применение миграций Alembic...")
