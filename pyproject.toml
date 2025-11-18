@@ -3,7 +3,7 @@
 # =================================================================
 
 [project]
-name = "habittrackertelegrambot"
+name = "HabitTrackerTelegramBot"
 version = "0.1.0"
 description = ""
 authors = [
@@ -38,6 +38,13 @@ dev = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry]
+# Явно указываем Poetry, где находятся пакеты (современная замена `package-mode = false`)
+packages = [
+    { include = "api", from = "src" },
+    { include = "core_shared", from = "src" },
+]
+
 
 # =================================================================
 # Конфигурация Alembic
@@ -63,6 +70,9 @@ options = "run ruff format REVISION_SCRIPT_FILENAME"
 # =================================================================
 [tool.mypy]
 python_version = "3.12"
+
+# Указываем mypy, где искать модули
+mypy_path = "src"
 
 # Включаем строгие проверки
 
