@@ -1,7 +1,7 @@
 from typing import AsyncGenerator
 
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.core.database import get_db_session
@@ -26,9 +26,12 @@ async def test_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, N
     # Применяем переопределение
     app.dependency_overrides[get_db_session] = override_get_db_session
 
-    # Создаем асинхронный HTTP-клиент для взаимодействия с приложением
-    async with AsyncClient(app=app, base_url="http://test") as client:  # type: ignore
-        yield client
+    # Создаем транспорт для ASGI приложения
+    transport = ASGITransport(app=app)
+
+    # Создаем асинхронный HTTP-клиент с транспортом для взаимодействия с приложением
+    async with AsyncClient(transport=transport, base_url="http://test") as test_client:
+        yield test_client
 
     # Очищаем переопределение после теста
     del app.dependency_overrides[get_db_session]

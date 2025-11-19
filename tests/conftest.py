@@ -27,14 +27,14 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 @pytest.fixture(scope="session")
 def docker_compose_file(pytestconfig) -> str:
-    """Указывает pytest-docker путь к docker-compose.yml файлу."""
-    return "docker-compose.yml"
+    """Указывает pytest-docker путь к специальному docker-compose файлу для тестов."""
+    return "docker-compose.test.yml"
 
 
 def is_postgres_responsive(db_url: str) -> bool:
     """Вспомогательная функция для проверки доступности PostgreSQL."""
     try:
-        conn = psycopg.connect(db_url.replace("+psycopg", ""), timeout=2)
+        conn = psycopg.connect(db_url.replace("+psycopg", ""), connect_timeout=2)
         conn.close()
         return True
     except psycopg.OperationalError:
