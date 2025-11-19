@@ -1,5 +1,5 @@
 # =================================================================
-# Poetry
+# Конфигурация проекта и Poetry
 # =================================================================
 
 [project]
@@ -39,11 +39,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-# Явно указываем Poetry, где находятся пакеты (современная замена `package-mode = false`)
-packages = [
-    { include = "api", from = "src" },
-    { include = "core_shared", from = "src" },
-]
+package-mode = false
 
 
 # =================================================================
@@ -71,9 +67,6 @@ options = "run ruff format REVISION_SCRIPT_FILENAME"
 [tool.mypy]
 python_version = "3.12"
 
-# Указываем mypy, где искать модули
-mypy_path = "src"
-
 # Включаем строгие проверки
 
 # Проверяет тела функций, даже если у них нет аннотаций типов
@@ -92,7 +85,14 @@ warn_unused_ignores = true  # Помогает поддерживать чист
 ignore_missing_imports = true
 
 # Директории для исключения из проверки
-exclude = ["migrations/", "tests/"]
+
+exclude = [
+    "alembic/",
+    "tests/",
+    "docker/"
+]
+# Включаем явное определение баз пакетов (помогает с namespace packages)
+explicit_package_bases = true
 
 # =================================================================
 # Конфигурация Ruff
@@ -134,4 +134,24 @@ exclude = [
     ".venv",
     "venv",
     ".ruff_cache",
+]
+
+
+# =================================================================
+# Конфигурация Pytest
+# =================================================================
+[tool.pytest.ini_options]
+# Добавляем src в путь поиска модулей, чтобы тесты видели 'src.api...'
+pythonpath = ["src"]
+
+# Настройки для pytest-asyncio
+# auto - автоматически помечает async функции как тесты
+asyncio_mode = "auto"
+# Указываем, где искать фикстуру event_loop (scope session)
+asyncio_default_fixture_loop_scope = "session"
+
+# Игнорируем предупреждения о deprecation (опционально, чтобы вывод был чище)
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
 ]

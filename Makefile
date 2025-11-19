@@ -107,7 +107,7 @@ format:
 
 types:
 	@echo "-> Статическая проверка типов с помощью mypy..."
-	mypy --package src.api --package src.core_shared
+	mypy .
 
 test:
 	@echo "-> Запуск тестов pytest..."
