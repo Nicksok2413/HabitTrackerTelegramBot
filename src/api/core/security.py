@@ -87,7 +87,9 @@ def verify_and_decode_token(token: str) -> TokenPayload:
         raise UnauthorizedException(message="Невалидный токен.", error_type="invalid_token") from None
     except ValidationError as exc:  # Ошибка валидации Pydantic для TokenPayload
         log.warning(f"Ошибка валидации payload токена: {exc.errors()}")
-        raise UnauthorizedException(message="Некорректные данные в токене.", error_type="invalid_token_payload") from None
+        raise UnauthorizedException(
+            message="Некорректные данные в токене.", error_type="invalid_token_payload"
+        ) from None
     except Exception as exc:  # Непредвиденная ошибка при обработке токена
         log.error(f"Непредвиденная ошибка при обработке токена: {exc}", exc_info=True)
         raise UnauthorizedException(message="Ошибка обработки токена.", error_type="token_processing_error") from None
