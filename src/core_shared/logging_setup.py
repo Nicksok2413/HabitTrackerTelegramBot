@@ -2,10 +2,14 @@
 
 import os
 import sys
+from typing import TYPE_CHECKING
 
-import loguru
 from loguru import logger as global_loguru_logger
 from pydantic import BaseModel, Field
+
+# Импортируем Logger только для проверки типов
+if TYPE_CHECKING:
+    from loguru import Logger
 
 
 class LogConfig(BaseModel):
@@ -35,7 +39,7 @@ def setup_logger(
     service_name: str,
     log_config: LogConfig | None = None,
     log_level_override: str | None = None,
-) -> loguru.Logger:
+) -> "Logger":
     """
     Настраивает Loguru логгер для указанного сервиса и возвращает его экземпляр.
 
@@ -80,15 +84,22 @@ def setup_logger(
 
     # Обработчик для записи в файл (если включено)
     if current_config.enable_file_logging:
-        log_file_path_formatted = current_config.log_file_path.format(service_name=service_name.lower(), time="{time}")
-        # Убедимся, что директория logs существует
-        log_dir = os.path.dirname(log_file_path_formatted.split("{time}")[0])
+        # Меняем service_name
+        log_file_path_formatted = current_config.log_file_path.replace("{service_name}", service_name.lower())
 
+        # Вычисляем директорию. Разбиваем строку по "{time}", чтобы отсечь динамическую часть имени файла.
+        # Если в пути нет {time}, берем просто директорию от файла.
+        if "{time}" in log_file_path_formatted:
+            log_dir = os.path.dirname(log_file_path_formatted.split("{time}")[0])
+        else:
+            log_dir = os.path.dirname(log_file_path_formatted)
+
+        # Пытаемся создать директорию
         if log_dir and not os.path.exists(log_dir):
             try:
                 os.makedirs(log_dir, exist_ok=True)
             except OSError as exc:
-                # Если не удалось создать директорию, логируем через stderr (он уже настроен)
+                # Если не удалось создать директорию, логируем через stderr
                 service_specific_logger.warning(
                     f"Не удалось создать директорию для логов '{log_dir}': {exc}. "
                     f"Логирование в файл для сервиса '{service_name}' будет отключено."
