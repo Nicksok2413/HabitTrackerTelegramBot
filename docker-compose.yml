@@ -45,6 +45,8 @@ services:
   # Сервис миграций
   api-migrate:
     <<: *api-base-config
+    # Сервис запустится только если явно попросить профиль 'tools' или сам сервис
+    profiles: ["tools"]
     # Команда для выполнения миграций (будет передана в entrypoint как "$@")
     command: alembic upgrade head
     restart: "no"
