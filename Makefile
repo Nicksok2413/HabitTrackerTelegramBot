@@ -60,7 +60,10 @@ prune:
 	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		echo "-> Начинаем полную очистку..."; \
+		# Чистим основное окружение
 		docker compose down -v; \
+		# Чистим тестовое окружение (на случай, если что-то осталось)
+		docker compose -f docker-compose.test.yml down -v; \
 		echo "-> Окружение полностью очищено."; \
 	else \
 		echo "-> Очистка отменена."; \
