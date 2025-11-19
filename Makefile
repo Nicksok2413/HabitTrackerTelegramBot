@@ -120,6 +120,5 @@ test-cov:
 	@echo "-> Запуск тестов pytest с отчетом о покрытии..."
 	pytest --cov=src/ --cov-report=term-missing --cov-report=html
 
-# check: lint format types test
-check: lint format
+check: lint format types test
 	@echo "-> Все проверки успешно пройдены!"
