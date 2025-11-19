@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Версия API
     API_VERSION: str = "0.1.0"
     # Хост API
-    API_HOST: str = "0.0.0.0"
+    API_HOST: str = "0.0.0.0"  # noqa: S104 - 0.0.0.0 необходимо для Docker контейнера
     # Порт API
     API_PORT: int = 8000
     # URL для внутреннего взаимодействия бот -> API

@@ -81,16 +81,16 @@ def verify_and_decode_token(token: str) -> TokenPayload:
 
     except ExpiredSignatureError:
         log.warning("Срок действия JWT токена истек.")
-        raise UnauthorizedException(message="Срок действия токена истек.", error_type="token_expired")
+        raise UnauthorizedException(message="Срок действия токена истек.", error_type="token_expired") from None
     except JWTError as exc:  # Общий класс ошибок JWT от python-jose
         log.warning(f"Ошибка декодирования/валидации JWT: {exc}")
-        raise UnauthorizedException(message="Невалидный токен.", error_type="invalid_token")
+        raise UnauthorizedException(message="Невалидный токен.", error_type="invalid_token") from None
     except ValidationError as exc:  # Ошибка валидации Pydantic для TokenPayload
         log.warning(f"Ошибка валидации payload токена: {exc.errors()}")
-        raise UnauthorizedException(message="Некорректные данные в токене.", error_type="invalid_token_payload")
+        raise UnauthorizedException(message="Некорректные данные в токене.", error_type="invalid_token_payload") from None
     except Exception as exc:  # Непредвиденная ошибка при обработке токена
         log.error(f"Непредвиденная ошибка при обработке токена: {exc}", exc_info=True)
-        raise UnauthorizedException(message="Ошибка обработки токена.", error_type="token_processing_error")
+        raise UnauthorizedException(message="Ошибка обработки токена.", error_type="token_processing_error") from None
 
     log.debug(f"Токен успешно верифицирован. Payload: {token_payload.model_dump_json()}")
     return token_payload
