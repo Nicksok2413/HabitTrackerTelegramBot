@@ -30,7 +30,7 @@ RUN wget -O su-exec.tar.gz https://github.com/ncopa/su-exec/archive/master.tar.g
     rm -rf su-exec.tar.gz su-exec-master
 
 # Устанавливаем Poetry
-RUN pip install --upgrade pip \
+RUN pip install --upgrade pip && \
     pip install poetry
 
 # Копируем только файлы, определяющие зависимости
@@ -38,7 +38,7 @@ COPY pyproject.toml poetry.lock ./
 
 # Устанавливаем зависимости
 # --no-dev: не устанавливаем зависимости для разработки (pytest, ruff и т.д.) в production-образ
-RUN poetry install --no-dev --no-root
+RUN poetry install --only main --no-root
 
 # =================================================================
 # Этап 2: "runner" - Финальный, чистый образ для запуска приложения
