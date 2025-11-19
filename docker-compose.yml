@@ -34,26 +34,6 @@ services:
     networks:
       - backend
 
-  # Изолированный сервис Базы данных для тестов
-  test-db:
-    image: postgres:18-alpine
-    container_name: habit_tracker_test_db
-    environment:
-      # Используем отдельные переменные для тестов
-      POSTGRES_DB: test_db
-      POSTGRES_USER: test_user
-      POSTGRES_PASSWORD: test_password
-    # healthcheck для консистентности и надежности тестов
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U test_user -d test_db" ]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-    restart: "no"
-    networks:
-      - backend
-
   # Сервис API
   api:
     <<: *api-base-config
