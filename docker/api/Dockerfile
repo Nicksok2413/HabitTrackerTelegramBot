@@ -5,10 +5,10 @@
 FROM python:3.12-slim as builder
 
 # Устанавливаем переменные окружения для Poetry
-# Отключает интерактивные запросы
-ENV POETRY_NO_INTERACTION=1
-# Заставляем Poetry не создавать виртуальное окружение, а устанавливать зависимости в системный python
-ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=1 \
+    POETRY_VIRTUALENVS_IN_PROJECT=1 \
+    PIP_NO_CACHE_DIR=1
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -51,6 +51,9 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED 1
 # Не создавать .pyc файлы
 ENV PYTHONDONTWRITEBYTECODE 1
+# Добавляем виртуальное окружение в PATH
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -65,8 +68,8 @@ RUN apt-get update && \
 # Копируем скомпилированный `su-exec` из этапа "builder"
 COPY --from=builder /usr/local/bin/su-exec /usr/local/bin/su-exec
 
-# Копируем установленные зависимости из этапа "builder"
-COPY --from=builder /app /app
+# Копируем виртуальное окружение с зависимостями из этапа "builder"
+COPY --from=builder /app/.venv /app/.venv
 
 # Копируем entrypoint-скрипт
 COPY ./docker/api/entrypoint.sh /entrypoint.sh
