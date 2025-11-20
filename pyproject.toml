@@ -51,6 +51,8 @@ package-mode = false
 # Путь к директории с миграциями
 script_location = "alembic"
 
+prepend_sys_path = ["."]
+
 # Определяем хуки, которые запускаются после создания нового файла миграции
 [[tool.alembic.post_write_hooks]]
 # Название хука
