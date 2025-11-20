@@ -175,3 +175,27 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning"
 ]
+
+# Настройки pytest-env
+
+# Эти переменные будут установлены до запуска тестов и до импорта config.py
+# Это гарантирует, что Pydantic Settings подхватит именно их
+env = [
+    # Включаем режим разработки для подробных логов и ошибок
+    "DEVELOPMENT=True",
+
+    # Подключение к тестовой базе данных (которую поднимет pytest-docker на порту 5433)
+    "DB_HOST=localhost",
+    "DB_PORT=5433",
+    "DB_NAME=test_db",
+    "DB_USER=test_user",
+    "DB_PASSWORD=test_password",
+
+    # Заглушки для обязательных полей Pydantic (чтобы не было Validation Error при старте)
+    "BOT_TOKEN=test_bot_token",
+    "API_BOT_SHARED_KEY=test_shared_key",
+    "JWT_SECRET_KEY=test_jwt_secret",
+
+    # Явно отключаем Sentry в тестах, даже если DSN есть в .env
+    "SENTRY_DSN="
+]
