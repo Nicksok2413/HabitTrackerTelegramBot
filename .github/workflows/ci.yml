@@ -1,0 +1,65 @@
+name: CI Pipeline
+
+# Триггеры для запуска воркфлоу
+on:
+  push:
+    branches: [ "main", "dev" ]  # Запуск на пуши в main и dev
+  pull_request:
+    branches: [ "main" ]  # Запуск на создание/обновление PR в main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest  # Запускаем на последней версии Ubuntu
+
+    steps:
+      # 1. Клонируем репозиторий
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 3. Устанавливаем Poetry
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "latest"
+          installer-parallel: true
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      # 4. Настраиваем кэширование виртуального окружения
+      - name:  Load cached venv
+        id: cached-dependencies # Даем ID этому шагу, чтобы ссылаться на него
+        uses: actions/cache@v4
+        with:
+          # Путь к директории, которую нужно кэшировать
+          path: .venv
+          # Ключ кэша: он будет уникальным для комбинации ОС, версии Python и содержимого poetry.lock
+          key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          # Ключи для восстановления, если точного совпадения нет
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+
+      # 5. Устанавливаем зависимости
+      - name: Install dependencies
+        # Запускаем этот шаг, только если кэш не был найден
+        if: steps.cached-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      # 6. Проверка кода с помощью Ruff
+      - name: Lint & format check (Ruff)
+        run: |
+           make lint
+           make format-check
+
+      # 7. Проверка статической типизации с помощью mypy
+      - name: Static type check (mypy)
+        run: make types
+
+      # 8. Запуск тестов Pytest
+      - name: Run tests (Pytest)
+        run: make test
