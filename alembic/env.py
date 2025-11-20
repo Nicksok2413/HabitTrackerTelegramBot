@@ -5,9 +5,8 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 # Импортируем базовую модель SQLAlchemy
-from src.api.models.base import Base
-# # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
-# from src.api.models import habit, habit_execution, user # type: ignore
+from src.api.models import Base  # Это подтянет все модели через __init__
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
