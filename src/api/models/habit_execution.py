@@ -37,8 +37,6 @@ class HabitExecution(Base):
         habit: Связь с привычкой, к которой относится это выполнение.
     """
 
-    __tablename__ = "habit_executions"
-
     habit_id: Mapped[int] = mapped_column(ForeignKey("habits.id", ondelete="CASCADE"), nullable=False, index=True)
     execution_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     status: Mapped[HabitExecutionStatus] = mapped_column(
