@@ -120,5 +120,5 @@ test-cov:
 	@echo "-> Запуск тестов pytest с отчетом о покрытии..."
 	poetry run pytest --cov=src/ --cov-report=term-missing --cov-report=html
 
-check: lint format types test
+check: lint format-check types test
 	@echo "-> Все проверки успешно пройдены!"
