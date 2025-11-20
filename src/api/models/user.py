@@ -22,13 +22,11 @@ class User(Base):
         first_name: Имя пользователя в Telegram (может быть None).
         last_name: Фамилия пользователя в Telegram (может быть None).
         is_active: Флаг, активен ли пользователь в системе.
-        is_bot_blocked: Флаг, заблокировал ли пользователь бота.
+        is_bot_blocked: Флаг блокировки бота пользователем.
         created_at: Время создания записи (унаследовано от TimestampMixin).
         updated_at: Время последнего обновления записи (унаследовано от TimestampMixin).
-        habits: Список привычек, созданных пользователем.
+        habits: Связанные привычки.
     """
-
-    __tablename__ = "users"
 
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
     username: Mapped[str | None] = mapped_column(String(100), index=True)
