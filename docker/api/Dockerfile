@@ -85,6 +85,8 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-creat
 RUN chown appuser:appgroup /app
 
 # Копируем код, нужный для API и миграций, сразу устанавливая правильного владельца
+COPY --chown=appuser:appgroup alembic.ini ./
+COPY --chown=appuser:appgroup pyproject.toml ./
 COPY --chown=appuser:appgroup ./alembic ./alembic
 COPY --chown=appuser:appgroup ./src/api ./src/api
 COPY --chown=appuser:appgroup ./src/core_shared ./src/core_shared
