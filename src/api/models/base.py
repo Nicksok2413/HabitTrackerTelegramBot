@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, MetaData, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 # Соглашение об именовании для внешних ключей и индексов (для Alembic и SQLAlchemy)
 # https://alembic.sqlalchemy.org/en/latest/naming.html
@@ -48,24 +48,41 @@ class Base(DeclarativeBase, TimestampMixin):
     Базовый класс для декларативных моделей SQLAlchemy.
 
     Предоставляет:
-    - Стандартный __repr__.
+    - Настроенный metadata (naming convention).
+    - Автоматическое именование таблиц (User -> users).
     - Общий первичный ключ 'id'.
     - Поля created_at и updated_at (через TimestampMixin).
-    - Настроенный metadata.
+    - Стандартный __repr__.
     """
 
-    metadata = metadata_obj  # Применение соглашения об именовании
+    # Явно указываем, что это абстрактный класс
+    # Это предотвращает создание таблицы 'bases' и гарантирует, что этот класс используется только как шаблон
+    __abstract__ = True
+
+    # Применение соглашения об именовании
+    metadata = metadata_obj
+
+    @declared_attr.directive
+    def __tablename__(cls) -> str:
+        """
+        Автоматически генерирует имя таблицы на основе имени класса.
+
+        Для сложных случаев (Child -> Children) можно переопределять атрибут __tablename__ в самой модели.
+        Пример: User -> users.
+        """
+        # Простая плюрализация: добавляем 's'
+        return f"{cls.__name__.lower()}s"
 
     # Общий первичный ключ для большинства моделей
-    # Если у какой-то модели будет другой ПК, его нужно будет объявить там явно.
+    # Если у какой-то модели будет другой ПК, его нужно будет объявить там явно
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     def __repr__(self) -> str:
         """
         Возвращает строковое представление объекта модели.
 
-        Пример: <User(id=1)>
         Включает имя класса и значение первичного ключа 'id'.
         Если модель имеет другой первичный ключ, этот метод нужно переопределить.
+        Пример: <User(id=1)>.
         """
         return f"<{self.__class__.__name__}(id={self.id!r})>"
