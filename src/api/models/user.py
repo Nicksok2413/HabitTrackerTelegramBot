@@ -21,6 +21,7 @@ class User(Base):
         username: Username пользователя в Telegram (может быть None).
         first_name: Имя пользователя в Telegram (может быть None).
         last_name: Фамилия пользователя в Telegram (может быть None).
+        timezone: Часовой пояс пользователя (формат IANA, например 'Europe/Moscow').
         is_active: Флаг, активен ли пользователь в системе.
         is_bot_blocked: Флаг блокировки бота пользователем.
         created_at: Время создания записи (унаследовано от TimestampMixin).
@@ -32,6 +33,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(100), index=True)
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
+    timezone: Mapped[str] = mapped_column(String(50), default="UTC", nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_bot_blocked: Mapped[bool] = mapped_column(default=False, nullable=False)
 
