@@ -4,14 +4,43 @@ from typing import AsyncGenerator, Generator
 import psycopg
 import pytest
 import pytest_asyncio
+from alembic import command
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from alembic import command
+from src.api.core.config import settings
 
 # URL тестовой базы данных
+# Внимание: значения должны совпадать с теми, что в docker-compose.test.yml и pyproject.toml
 TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
+
+
+# --- ФИКСТУРА БЕЗОПАСНОСТИ ---
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_test_environment():
+    """
+    Проверяет, что тесты запускаются с корректными настройками окружения.
+
+    Эта фикстура выполняется автоматически перед началом тестовой сессии.
+    """
+    # Проверяем режим разработки
+    assert settings.DEVELOPMENT is True, (
+        "❌ ОШИБКА КОНФИГУРАЦИИ: Тесты должны запускаться в режиме разработки/тестирования (DEVELOPMENT=True). "
+        "Проверьте настройки [tool.pytest.ini_options] в pyproject.toml"
+    )
+
+    # Проверяем, что подключение не к продакшен/основной базе данных
+    assert "test" in settings.DB_NAME, (
+        f"❌ ОПАСНОСТЬ: Тесты пытаются использовать базу '{settings.DB_NAME}'. "
+        "Тестовая база должна содержать 'test' в названии."
+    )
+
+    # Проверяем, что используется тестовый порт (защита от конфликта с локальной dev-базой)
+    assert settings.DB_PORT == 5433, (
+        f"❌ ОШИБКА КОНФИГУРАЦИИ: Ожидался порт 5433 (тестовый), но получен {settings.DB_PORT}."
+    )
 
 
 # --- ГЛОБАЛЬНЫЕ ФИКСТУРЫ ДЛЯ ВСЕГО ПРОЕКТА ---
