@@ -68,6 +68,9 @@ options = "run ruff format REVISION_SCRIPT_FILENAME"
 [tool.mypy]
 python_version = "3.12"
 
+# Включаем явное определение баз пакетов (для импортов)
+explicit_package_bases = true
+
 # Включаем строгие проверки
 
 # Проверяет тела функций, даже если у них нет аннотаций типов
@@ -92,8 +95,6 @@ exclude = [
     "tests/",
     "docker/"
 ]
-# Включаем явное определение баз пакетов (помогает с namespace packages)
-explicit_package_bases = true
 
 # =================================================================
 # Конфигурация Ruff

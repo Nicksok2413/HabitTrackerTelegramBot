@@ -94,31 +94,31 @@ revision:
 # ------------------------------------------------------------------------------
 lint:
 	@echo "-> Проверка кода с помощью Ruff linter..."
-	ruff check src/
+	poetry run ruff check src/
 
 lint-fix:
 	@echo "-> Исправление кода с помощью Ruff linter..."
-	ruff check src/ --fix
+	poetry run ruff check src/ --fix
 
 format-check:
 	@echo "-> Форматирование кода с помощью Ruff formatter..."
-	ruff format src/ --check
+	poetry run ruff format src/ --check
 
 format:
 	@echo "-> Форматирование кода с помощью Ruff formatter..."
-	ruff format src/
+	poetry run ruff format src/
 
 types:
 	@echo "-> Статическая проверка типов с помощью mypy..."
-	mypy .
+	poetry run mypy .
 
 test:
 	@echo "-> Запуск тестов pytest..."
-	pytest
+	poetry run pytest
 
 test-cov:
 	@echo "-> Запуск тестов pytest с отчетом о покрытии..."
-	pytest --cov=src/ --cov-report=term-missing --cov-report=html
+	poetry run pytest --cov=src/ --cov-report=term-missing --cov-report=html
 
 check: lint format types test
 	@echo "-> Все проверки успешно пройдены!"
