@@ -33,8 +33,6 @@ class Habit(Base):
         executions: Список выполнений этой привычки.
     """
 
-    __tablename__ = "habits"
-
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
