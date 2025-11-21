@@ -57,14 +57,23 @@ END
 # Ожидание БД
 wait_for_db
 
-# Установка прав на том логов
 # Указываем пользователя и группу, под которыми будет работать приложение
 APP_USER=appuser
 APP_GROUP=appgroup
-echo "-> (API Entrypoint) Установка владельца для /logs на ${APP_USER}:${APP_GROUP}..."
+
+# Устанавливаем права на тома логов и миграций
+echo "-> (API Entrypoint) Выдача прав на /app/logs..."
 # Используем chown для изменения владельца точки монтирования тома
 # Это нужно делать от root перед понижением привилегий
 chown -R "${APP_USER}:${APP_GROUP}" /logs
+
+# Миграции (если папка существует, отдаем её пользователю)
+# Это позволит Alembic создавать файлы версий
+if [ -d "/app/alembic/versions" ]; then
+    echo "-> (API Entrypoint) Выдача прав на /app/alembic/versions..."
+    chown -R "${APP_USER}:${APP_GROUP}" /app/alembic/versions
+fi
+
 echo "-> (API Entrypoint) Права установлены."
 
 

@@ -1,96 +1,109 @@
 import logging
 import os
+import socket
+import sys
+
+from urllib.parse import quote_plus
 
 from alembic import context
-
-# Импортируем Loguru
-from loguru import logger
-
 from sqlalchemy import engine_from_config, pool
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models import Base  # Это подтянет все модели через __init__
 
-# Импортируем кастомный настройщик логирования
 from src.core_shared.logging_setup import setup_logger
 
+# Настройка логирования
 
-# --- Настройка логирования ---
+# Получаем базовый логгер Loguru
+loguru_logger = setup_logger("Alembic")
 
 class InterceptHandler(logging.Handler):
-    """Перехватывает логи стандартного модуля logging и перенаправляет их в Loguru."""
     def emit(self, record):
-        # Получаем соответствующий уровень логгера Loguru
         try:
-            level = logger.level(record.levelname).name
+            level = loguru_logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
-        # Ищем, откуда был вызван лог, чтобы правильно отобразить stack trace
         frame, depth = logging.currentframe(), 2
-
-        while frame.f_code.co_filename == logging.__file__:
+        while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger_opt = loguru_logger.bind(service_name="Alembic").opt(depth=depth, exception=record.exc_info)
+        logger_opt.log(level, record.getMessage())
 
-# Настраиваем Loguru (создаем файлы логов в /logs/alembic_...)
-# Используем функцию из core_shared, которая настроит ротацию, форматирование и файлы
-setup_logger(service_name="Alembic")
+# Подменяем logging
+logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
+# Отключаем лишний шум
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
-# Подменяем стандартный logging на перехватчик
-logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO)
-# Можно отключить лишний шум от некоторых библиотек, если нужно
-# logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+# Логгер для использования внутри этого файла
+logger = loguru_logger.bind(service_name="Alembic")
 
-
-# --- Конфигурируем Alembic ---
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+# if config.config_file_name is not None:
+#     fileConfig(config.config_file_name)
+
 # Указываем Alembic на метаданные базовой модели
 target_metadata = Base.metadata
+
 
 # Функция для формирования URL базы данных
 def get_database_url() -> str:
     """
-    Читает переменные окружения и формирует URL для базы данных.
+    Читает переменные окружения и формирует URL базы данных.
 
     Raises:
         ValueError, если одна или несколько переменных окружения отсутствуют.
     """
-    db_user = os.getenv("DB_USER")
-    db_password = os.getenv("DB_PASSWORD")
-    db_host = os.getenv("DB_HOST")
-    db_port = os.getenv("DB_PORT")
-    db_name = os.getenv("DB_NAME")
+    def get_env(key: str) -> str | None:
+        val = os.getenv(key)
+        return val.strip() if val else None
+
+    db_user = get_env("DB_USER")
+    db_password = get_env("DB_PASSWORD")
+    db_host = get_env("DB_HOST")
+    db_port = get_env("DB_PORT")
+    db_name = get_env("DB_NAME")
 
     # Проверка, что все переменные установлены
     if not all([db_user, db_password, db_host, db_port, db_name]):
         raise ValueError("Одна или несколько переменных для подключения к БД отсутствуют.")
 
-    return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-# Сначала пытаемся получить URL из существующей конфигурации (это позволяет тестам в conftest.py переопределять его)
-# Используем метод get_alembic_option вместо get_main_option (метод умеет читать и INI, и TOML)
-db_url = config.get_alembic_option("sqlalchemy.url")
+    try:
+        db_ip = socket.gethostbyname(db_host)
+        logger.info(f"DNS Check: Host '{db_host}' resolved to {db_ip}")
+    except Exception as e:
+        logger.critical(f"DNS Check FAILED: Host '{db_host}' could not be resolved. Error: {e}")
+        raise
+    # ------------------------------------
 
-# Если URL не был установлен извне, формируем его из переменных окружения
-if db_url is None:
-    # Формируем URL базы данных
-    db_url = get_database_url()
-    # Устанавливаем значение URL базы данных
-    config.set_main_option("sqlalchemy.url", db_url)
+    # Кодируем учетные данные (URL Encode)
+    # Это превращает 'p@ssword' в 'p%40ssword', что безопасно для строки подключения
+    encoded_user = quote_plus(db_user)
+    encoded_password = quote_plus(db_password)
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+    return f"postgresql+psycopg://{encoded_user}:{encoded_password}@{db_ip}:{db_port}/{db_name}"
+
+# Сначала пытаемся получить URL базы данных из существующей конфигурации
+# Это позволяет тестам в conftest.py переопределять его
+current_db_url = config.get_alembic_option("sqlalchemy.url")
+
+# Если URL базы данных не был установлен извне, формируем его из переменных окружения
+if not current_db_url:
+    try:
+        current_db_url = get_database_url()
+    except ValueError as exc:
+        logger.error(f"Config Error: {exc}")
+        sys.exit(1)
 
 
 def run_migrations_offline() -> None:
@@ -105,12 +118,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    # Гарантированно добавляем URL, который вычислили выше
-    # Берем его снова через get_alembic_option для единообразия
-    url = config.get_alembic_option("sqlalchemy.url")
-
     context.configure(
-        url=url,
+        url=current_db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -128,19 +137,12 @@ def run_migrations_online() -> None:
 
     """
     # Собираем конфигурацию вручную для надежности
-    # Получаем секцию как словарь (может быть пустым или неполным при использовании TOML)
-    configuration = config.get_section(config.config_ini_section, {})
-
-    # Гарантированно добавляем URL, который вычислили выше
-    # Берем его снова через get_alembic_option для единообразия
-    url = config.get_alembic_option("sqlalchemy.url")
-
-    if url:
-        configuration["sqlalchemy.url"] = url
+    connectable_config = config.get_section(config.config_ini_section, {})
+    connectable_config["sqlalchemy.url"] = current_db_url
 
     # Создаем движок
     connectable = engine_from_config(
-        configuration,
+        connectable_config,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
