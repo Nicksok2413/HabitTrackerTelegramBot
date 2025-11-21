@@ -84,8 +84,7 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-creat
 # Меняем владельца рабочей директории на appuser
 RUN chown appuser:appgroup /app
 
-# Копируем код, нужный для API и миграций, сразу устанавливая правильного владельца
-COPY --chown=appuser:appgroup alembic.ini ./
+# Копируем файлы, нужные для API и миграций, сразу устанавливая правильного владельца
 COPY --chown=appuser:appgroup pyproject.toml ./
 COPY --chown=appuser:appgroup ./alembic ./alembic
 COPY --chown=appuser:appgroup ./src/api ./src/api

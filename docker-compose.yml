@@ -48,7 +48,7 @@ services:
     # Сервис запустится только если явно попросить профиль 'tools' или сам сервис
     profiles: ["tools"]
     # Команда для выполнения миграций (будет передана в entrypoint как "$@")
-    command: alembic upgrade head
+    command: alembic -c pyproject.toml upgrade head
     restart: "no"
 
 

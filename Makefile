@@ -84,7 +84,7 @@ revision:
 		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
 		exit 1; \
 	fi
-	docker compose run --rm api alembic revision --autogenerate -m "$(m)"
+	docker compose run --rm api alembic -c pyproject.toml revision --autogenerate -m "$(m)"
 
 # ------------------------------------------------------------------------------
 # Проверка качества кода и тесты

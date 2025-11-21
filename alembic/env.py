@@ -40,9 +40,9 @@ def get_database_url() -> str:
 
     return f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
-# Сначала пытаемся получить URL из уже существующей конфигурации
-# (это позволяет тестам в conftest.py переопределять его)
-db_url = config.get_main_option("sqlalchemy.url")
+# Сначала пытаемся получить URL из существующей конфигурации (это позволяет тестам в conftest.py переопределять его)
+# Используем метод get_alembic_option вместо get_main_option (метод умеет читать и INI, и TOML)
+db_url = config.get_alembic_option("sqlalchemy.url")
 
 # Если URL не был установлен извне, формируем его из переменных окружения
 if db_url is None:
@@ -69,7 +69,10 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Гарантированно добавляем URL, который вычислили выше
+    # Берем его снова через get_alembic_option для единообразия
+    url = config.get_alembic_option("sqlalchemy.url")
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -88,8 +91,20 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Собираем конфигурацию вручную для надежности
+    # Получаем секцию как словарь (может быть пустым или неполным при использовании TOML)
+    configuration = config.get_section(config.config_ini_section, {})
+
+    # Гарантированно добавляем URL, который вычислили выше
+    # Берем его снова через get_alembic_option для единообразия
+    url = config.get_alembic_option("sqlalchemy.url")
+
+    if url:
+        configuration["sqlalchemy.url"] = url
+
+    # Создаем движок
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
