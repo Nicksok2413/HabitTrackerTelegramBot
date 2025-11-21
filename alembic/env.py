@@ -1,21 +1,57 @@
+import logging
 import os
-from logging.config import fileConfig
+
+from alembic import context
+
+# Импортируем Loguru
+from loguru import logger
 
 from sqlalchemy import engine_from_config, pool
-from alembic import context
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models import Base  # Это подтянет все модели через __init__
 
+# Импортируем кастомный настройщик логирования
+from src.core_shared.logging_setup import setup_logger
+
+
+# --- Настройка логирования ---
+
+class InterceptHandler(logging.Handler):
+    """Перехватывает логи стандартного модуля logging и перенаправляет их в Loguru."""
+    def emit(self, record):
+        # Получаем соответствующий уровень логгера Loguru
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Ищем, откуда был вызван лог, чтобы правильно отобразить stack trace
+        frame, depth = logging.currentframe(), 2
+
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+# Настраиваем Loguru (создаем файлы логов в /logs/alembic_...)
+# Используем функцию из core_shared, которая настроит ротацию, форматирование и файлы
+setup_logger(service_name="Alembic")
+
+# Подменяем стандартный logging на перехватчик
+logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO)
+# Можно отключить лишний шум от некоторых библиотек, если нужно
+# logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
+
+# --- Конфигурируем Alembic ---
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
 
 # Указываем Alembic на метаданные базовой модели
 target_metadata = Base.metadata
