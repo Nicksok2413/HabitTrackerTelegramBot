@@ -47,11 +47,11 @@ RUN poetry install --only main --no-root
 FROM python:3.12-slim
 
 # Переменные окружения для Runtime
-ENV PYTHONUNBUFFERED 1 \
-    PYTHONDONTWRITEBYTECODE 1 \
-    # Добавляем .venv в PATH, чтобы команды python/uvicorn/alembic работали напрямую
-    VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
+# Добавляем .venv в PATH, чтобы команды python/uvicorn/alembic работали напрямую
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
