@@ -11,7 +11,7 @@ set -e
 # Функция для проверки готовности БД
 wait_for_db() {
     echo "-> (API Entrypoint) Ожидание запуска PostgreSQL..."
-    python << END
+    /app/.venv/bin/python << END
 import os
 import psycopg
 import sys

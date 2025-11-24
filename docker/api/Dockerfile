@@ -29,15 +29,15 @@ RUN wget -O su-exec.tar.gz https://github.com/ncopa/su-exec/archive/master.tar.g
     cd / && \
     rm -rf su-exec.tar.gz su-exec-master
 
-# Устанавливаем Poetry
+# Обновляем pip и устанавливаем Poetry
 RUN pip install --upgrade pip && \
     pip install poetry
 
-# Копируем только файлы, определяющие зависимости
+# Копируем файлы, определяющие зависимости
 COPY pyproject.toml poetry.lock ./
 
 # Устанавливаем зависимости
-# --no-dev: не устанавливаем зависимости для разработки (pytest, ruff и т.д.) в production-образ
+# --only main: не устанавливаем dev-зависимости (pytest, ruff и т.д.) в production-образ
 RUN poetry install --only main --no-root
 
 # =================================================================
@@ -46,17 +46,24 @@ RUN poetry install --only main --no-root
 # Используем легковесный образ Python
 FROM python:3.12-slim
 
-# Стандартные переменные окружения для Python в Docker
-# Весь вывод (print, логи) будет сразу отправляться в консоль Docker
-ENV PYTHONUNBUFFERED 1
-# Не создавать .pyc файлы
-ENV PYTHONDONTWRITEBYTECODE 1
-# Добавляем виртуальное окружение в PATH
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
+# Переменные окружения для Runtime
+ENV PYTHONUNBUFFERED 1 \
+    PYTHONDONTWRITEBYTECODE 1 \
+    # Добавляем .venv в PATH, чтобы команды python/uvicorn/alembic работали напрямую
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
+
+# Создаем группу с GID 1000 и непривилегированного пользователя с UID 1000
+# Для безопасности, чтобы не запускать приложение от root
+# Для решения проблемы с правами доступа к volumes (миграции) и кэшами
+RUN groupadd -g 1000 appgroup && \
+    useradd -u 1000 -g appgroup -s /bin/sh -m appuser
+
+# Явно задаем HOME, чтобы инструменты (Ruff, Python) знали, где хранить кэш
+ENV HOME=/home/appuser
 
 # Устанавливаем только те системные пакеты, которые необходимы для работы приложения:
 # - libpq-dev: для работы драйвера psycopg
@@ -65,21 +72,17 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Копируем скомпилированный `su-exec` из этапа "builder"
+# Копируем скомпилированный `su-exec` и виртуальное окружение с зависимостями из этапа "builder"
 COPY --from=builder /usr/local/bin/su-exec /usr/local/bin/su-exec
-
-# Копируем виртуальное окружение с зависимостями из этапа "builder"
 COPY --from=builder /app/.venv /app/.venv
 
-# Копируем entrypoint-скрипт
+# Копируем entrypoint-скрипт и устанавливаем ему права на выполнение
 COPY ./docker/api/entrypoint.sh /entrypoint.sh
-
-# Устанавливаем права на выполнение entrypoint-скрипта
 RUN chmod +x /entrypoint.sh
 
-# Создаем системную группу `appgroup` и системного non-root пользователя `appuser`, чтобы не запускать приложение от root
-# `--no-create-home` — не создавать домашнюю директорию
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-create-home appuser
+# Создаем директорию для логов и устанавливаем владельца
+# Эта директория будет перекрыта томом, но полезно иметь ее с правильными правами в образе (для Self-Contained Image)
+RUN mkdir /logs && chown appuser:appgroup /logs
 
 # Меняем владельца рабочей директории на appuser
 RUN chown appuser:appgroup /app

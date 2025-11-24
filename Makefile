@@ -19,10 +19,6 @@ help:
 	@echo "  prune          - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
 	@echo "  logs           - Показать логи всех сервисов"
 	@echo ""
-	@echo "Управление миграциями базы данных:"
-	@echo "  migrate        - Применить миграции Alembic"
-	@echo "  revision       - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
-	@echo ""
 	@echo "Проверка качества кода и тесты:"
 	@echo "  lint           - Проверить код линтером Ruff"
 	@echo "  lint-fix       - Исправить код линтером Ruff"
@@ -32,6 +28,11 @@ help:
 	@echo "  test           - Запустить тесты pytest"
 	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
 	@echo "  check          - Запустить все проверки (lint, format-check, types, test) последовательно"
+	@echo ""
+	@echo "Управление миграциями базы данных:"
+	@echo "  migrate        - Применить миграции Alembic"
+	@echo "  revision       - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
+
 
 # ------------------------------------------------------------------------------
 # Установка зависимостей
@@ -70,40 +71,23 @@ prune:
 	fi
 
 # ------------------------------------------------------------------------------
-# Управление миграциями БД
-# ------------------------------------------------------------------------------
-migrate:
-	@echo "-> Применение миграций Alembic..."
-	# Запускаем временный контейнер api-migrate
-	docker compose run --rm api-migrate
-	@echo "-> Миграции успешно применены."
-
-revision:
-	# Проверяем, что передано сообщение для миграции
-	@if [ -z "$(m)" ]; then \
-		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
-		exit 1; \
-	fi
-	docker compose run --rm api-migrate alembic -c pyproject.toml revision --autogenerate -m "$(m)"
-
-# ------------------------------------------------------------------------------
 # Проверка качества кода и тесты
 # ------------------------------------------------------------------------------
 lint:
 	@echo "-> Проверка кода с помощью Ruff linter..."
-	poetry run ruff check src/
+	poetry run ruff check .
 
 lint-fix:
 	@echo "-> Исправление кода с помощью Ruff linter..."
-	poetry run ruff check src/ --fix
+	poetry run ruff check . --fix
 
 format-check:
 	@echo "-> Форматирование кода с помощью Ruff formatter..."
-	poetry run ruff format src/ --check
+	poetry run ruff format . --check
 
 format:
 	@echo "-> Форматирование кода с помощью Ruff formatter..."
-	poetry run ruff format src/
+	poetry run ruff format .
 
 types:
 	@echo "-> Статическая проверка типов с помощью mypy..."
@@ -119,3 +103,26 @@ test-cov:
 
 check: lint format-check types test
 	@echo "-> Все проверки успешно пройдены!"
+
+# ------------------------------------------------------------------------------
+# Управление миграциями БД
+# ------------------------------------------------------------------------------
+migrate:
+	@echo "-> Применение миграций Alembic..."
+	# Запускаем временный контейнер api-migrate
+	docker compose run --rm api-migrate
+	@echo "-> Миграции успешно применены."
+
+revision:
+	# Проверяем, что передано сообщение для миграции
+	@if [ -z "$(m)" ]; then \
+		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
+		exit 1; \
+	fi
+
+	@echo "-> Создание новой миграции..."
+	docker compose run --rm api-migrate alembic -c pyproject.toml revision --autogenerate -m "$(m)"
+	@echo "-> Миграция успешно создана."
+	@echo "-> Форматирование новой миграции..."
+	make format
+	@echo "-> Готово."
