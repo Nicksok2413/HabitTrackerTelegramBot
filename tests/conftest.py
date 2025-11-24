@@ -4,11 +4,11 @@ from typing import AsyncGenerator, Generator
 import psycopg
 import pytest
 import pytest_asyncio
-from alembic import command
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from alembic import command
 from src.api.core.config import settings
 
 # URL тестовой базы данных
@@ -17,6 +17,7 @@ TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433
 
 
 # --- ФИКСТУРА БЕЗОПАСНОСТИ ---
+
 
 @pytest.fixture(scope="session", autouse=True)
 def verify_test_environment():
