@@ -52,17 +52,6 @@ package-mode = false
 script_location = "alembic"
 prepend_sys_path = ["."]
 
-## Определяем хуки, которые запускаются после создания нового файла миграции
-#[[tool.alembic.post_write_hooks]]
-## Название хука
-#name = "ruff"
-## Тип 'exec' означает запуск внешней команды
-#type = "exec"
-## Команда для запуска
-#executable = "poetry"
-## Аргументы для команды (REVISION_SCRIPT_FILENAME - специальная переменная Alembic)
-#options = "run ruff format REVISION_SCRIPT_FILENAME"
-
 
 # =================================================================
 # Конфигурация Mypy
