@@ -1,21 +1,20 @@
 import logging
-
 from os import getenv
-from socket import gethostbyname
 from urllib.parse import quote_plus
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models import Base  # Это подтянет все модели через __init__
-
 from src.core_shared.logging_setup import setup_logger
 
 # Настройка логирования
 
 # Получаем базовый логгер Loguru
 loguru_logger = setup_logger("Alembic")
+
 
 class InterceptHandler(logging.Handler):
     """Перехватывает логи стандартного модуля logging и перенаправляет их в Loguru."""
@@ -36,6 +35,7 @@ class InterceptHandler(logging.Handler):
 
         logger_opt = loguru_logger.bind(service_name="Alembic").opt(depth=depth, exception=record.exc_info)
         logger_opt.log(level, record.getMessage())
+
 
 # Подменяем logging
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
@@ -80,6 +80,7 @@ def get_database_url() -> str:
     encoded_password = quote_plus(db_password)
 
     return f"postgresql+psycopg://{encoded_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
+
 
 # Сначала пытаемся получить URL базы данных из существующей конфигурации
 # Это позволяет тестам в conftest.py переопределять его
