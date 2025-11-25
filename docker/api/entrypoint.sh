@@ -11,7 +11,7 @@ set -e
 # Функция для проверки готовности БД
 wait_for_db() {
     echo "-> (API Entrypoint) Ожидание запуска PostgreSQL..."
-    python << END
+    /app/.venv/bin/python << END
 import os
 import psycopg
 import sys
@@ -62,21 +62,21 @@ APP_USER=appuser
 APP_GROUP=appgroup
 
 # Устанавливаем права на тома логов
-echo "-> (API Entrypoint) Выдача прав на /app/logs..."
 # Используем chown для изменения владельца точки монтирования тома
 # Это нужно делать от root перед понижением привилегий
+echo "-> (API Entrypoint) Выдача прав на /app/logs..."
 chown -R "${APP_USER}:${APP_GROUP}" /logs
 echo "-> (API Entrypoint) Права установлены."
 
 
-# Анализируем первый аргумент (`$1`), чтобы понять, что будет запущено
-case "$1" in
-  # Если первый аргумент - "uvicorn", запускаем веб-сервер
-  "uvicorn")
+# Анализируем команду, чтобы понять, что будет запущено
+case "$@" in
+  # Если в команде встречается слово "uvicorn", запускаем веб-сервер
+  *"uvicorn"*)
     echo "-> (API Entrypoint) Запуск основного приложения Uvicorn..."
     ;;
-  # Если первый аргумент - "alembic", работаем с миграциями
-  "alembic")
+  # # Если в команде встречается слово "alembic", работаем с миграциями
+  *"alembic"*)
     echo "-> (API Entrypoint) Выполнение команды Alembic: $@"
     ;;
   # "*" - любой другой случай (например, запуск `bash` для отладки)

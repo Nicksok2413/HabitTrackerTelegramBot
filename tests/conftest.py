@@ -91,7 +91,7 @@ def apply_migrations(postgres_service: None) -> Generator[None, None, None]:
     # Создаем объект Config
     alembic_cfg = Config()
     # Устанавливаем путь к скриптам
-    alembic_cfg.set_main_option("script_location", "alembic")
+    alembic_cfg.set_main_option("script_location", "migrations")
     # Устанавливаем URL тестовой базы данных
     alembic_cfg.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
 

@@ -39,7 +39,7 @@ services:
     <<: *api-base-config
     container_name: habit_tracker_api
     # Команда для "продакшен" запуска (будет передана в entrypoint как "$@")
-    command: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
   # Сервис миграций
@@ -48,7 +48,7 @@ services:
     # Сервис запустится только если явно попросить профиль 'tools' или сам сервис
     profiles: ["tools"]
     # Команда для выполнения миграций (будет передана в entrypoint как "$@")
-    command: alembic -c pyproject.toml upgrade head
+    command: python -m alembic -c pyproject.toml upgrade head
     restart: "no"
 
 

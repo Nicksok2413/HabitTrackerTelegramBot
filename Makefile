@@ -121,7 +121,7 @@ revision:
 	fi
 
 	@echo "-> Создание новой миграции..."
-	docker compose run --rm api-migrate alembic -c pyproject.toml revision --autogenerate -m "$(m)"
+	docker compose run --rm api-migrate python -m alembic -c pyproject.toml revision --autogenerate -m "$(m)"
 	@echo "-> Миграция успешно создана."
 	@echo "-> Форматирование новой миграции..."
 	make format
