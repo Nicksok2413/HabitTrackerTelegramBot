@@ -2,9 +2,8 @@ import logging
 from os import getenv
 from urllib.parse import quote_plus
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models import Base  # Это подтянет все модели через __init__

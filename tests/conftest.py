@@ -4,11 +4,11 @@ from typing import AsyncGenerator, Generator
 import psycopg
 import pytest
 import pytest_asyncio
+from alembic import command
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from alembic import command
 from src.api.core.config import settings
 
 # URL тестовой базы данных
