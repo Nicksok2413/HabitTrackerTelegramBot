@@ -1,4 +1,4 @@
-"""Базовые конфигурации и схемы для Pydantic."""
+"""Базовая конфигурация и схема для Pydantic."""
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,5 +9,5 @@ class BaseSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,  # Позволяет создавать схемы из ORM моделей
         populate_by_name=True,  # Позволяет использовать alias для полей
-        extra="ignore",  # Игнорировать лишние поля при парсинге
+        # extra="ignore",  # Игнорировать лишние поля при парсинге (Pydantic v2 и так это делает по умолчанию)
     )

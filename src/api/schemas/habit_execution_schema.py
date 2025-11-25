@@ -20,7 +20,7 @@ class HabitExecutionSchemaCreate(BaseSchema):  # Не наследуем от Ha
     """Схема для создания (фиксации) новой записи о выполнении привычки."""
 
     # habit_id будет браться из path parameter эндпоинта
-    # execution_date будет установлена сервером как текущая дата.
+    # execution_date будет установлена сервером как текущая дата
     status: HabitExecutionStatus = Field(
         ...,
         description="Статус выполнения на сегодня (например, DONE, NOT_DONE, SKIPPED)",
@@ -34,7 +34,6 @@ class HabitExecutionSchemaUpdate(BaseSchema):
     """
 
     status: HabitExecutionStatus = Field(..., description="Новый статус выполнения привычки")
-    # execution_date и habit_id обычно не меняются после создания
 
 
 class HabitExecutionSchemaRead(HabitExecutionSchemaBase):

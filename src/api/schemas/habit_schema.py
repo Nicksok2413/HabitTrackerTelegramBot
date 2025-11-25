@@ -1,20 +1,23 @@
 """Схемы Pydantic для модели Habit."""
 
 from datetime import datetime, time
+from typing import TYPE_CHECKING
 
 from pydantic import Field
 
 from .base_schema import BaseSchema
-from .habit_execution_schema import HabitExecutionSchemaRead  # Для вложенных выполнений
+
+if TYPE_CHECKING:
+    from .habit_execution_schema import HabitExecutionSchemaRead
 
 
 class HabitSchemaBase(BaseSchema):
-    """Базовая схема для привычки, содержит редактируемые поля."""
+    """Базовая схема для привычки."""
 
     name: str = Field(..., min_length=1, max_length=255, description="Название привычки")
-    description: str | None = Field(None, description="Описание привычки")
-    time_to_remind: time = Field(..., description="Время дня для отправки напоминания (ЧЧ:ММ)")
+    description: str | None = Field(None, description="Описание привычки (может отсутствовать)")
     # target_days будет устанавливаться при создании из настроек или переданного значения
+    time_to_remind: time = Field(..., description="Время дня для отправки напоминания (ЧЧ:ММ)")
 
 
 class HabitSchemaCreate(HabitSchemaBase):
@@ -27,12 +30,15 @@ class HabitSchemaCreate(HabitSchemaBase):
         gt=0,
         description="Количество дней для формирования привычки (если не указано, используется значение из настроек)",
     )
-    # current_streak и max_streak будут 0 по умолчанию в модели
     # is_active будет True по умолчанию в модели
+    # current_streak и max_streak будут 0 по умолчанию в модели
 
 
 class HabitSchemaUpdate(BaseSchema):
-    """Схема для обновления существующей привычки. Все поля опциональны."""
+    """
+    Схема для обновления существующей привычки.
+    Все поля опциональны.
+    """
 
     name: str | None = Field(None, min_length=1, max_length=255, description="Новое название привычки")
     description: str | None = Field(None, description="Новое описание привычки")
@@ -60,6 +66,3 @@ class HabitSchemaReadWithExecutions(HabitSchemaRead):
     """Схема для чтения данных привычки (ответа API) с выполнениями."""
 
     executions: list["HabitExecutionSchemaRead"] = Field(default_factory=list)
-
-
-# HabitSchemaRead.model_rebuild() # Для циклических зависимостей

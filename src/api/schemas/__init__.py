@@ -1,6 +1,6 @@
 """Инициализация модуля схем Pydantic."""
 
-# Экспортируем Enum тоже, если он нужен вовне
+# Экспортируем Enum
 from src.api.models import HabitExecutionStatus
 
 from .base_schema import BaseSchema
@@ -44,6 +44,5 @@ __all__ = [
 
 # Выполняем model_rebuild для схем, которые могут иметь циклические зависимости
 # с отложенными аннотациями типов (если бы они были активно использованы)
-# Пример:
+HabitSchemaReadWithExecutions.model_rebuild()
 # UserSchemaRead.model_rebuild()
-# HabitSchemaRead.model_rebuild()

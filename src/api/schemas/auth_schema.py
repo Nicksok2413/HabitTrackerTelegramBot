@@ -29,5 +29,5 @@ class BotLoginRequest(BaseModel):
 
     telegram_id: int = Field(..., gt=0, description="Telegram ID пользователя")
     username: str | None = Field(None, max_length=100, description="Username пользователя (если есть)")
-    first_name: str | None = Field(None, max_length=100, description="Имя пользователя")
+    first_name: str | None = Field(None, max_length=100, description="Имя пользователя (если есть)")
     last_name: str | None = Field(None, max_length=100, description="Фамилия пользователя (если есть)")
