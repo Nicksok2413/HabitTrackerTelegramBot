@@ -42,8 +42,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
             Sequence[Habit]: Список привычек пользователя.
         """
         log.debug(
-            f"Получение привычек для пользователя ID: {user_id}, "
-            f"skip={skip}, limit={limit}, active_only={active_only})"
+            f"Получение привычек для пользователя ID: {user_id}, skip={skip}, limit={limit}, active_only={active_only})"
         )
 
         # Явно указываем тип списка: list[ColumnElement[bool]]

@@ -81,12 +81,12 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         return result.scalar_one_or_none()
 
     async def get_multi(
-            self,
-            db_session: AsyncSession,
-            *,
-            skip: int = 0,
-            limit: int = 100,
-            order_by: list[ColumnElement[Any]] | None = None,
+        self,
+        db_session: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        order_by: list[ColumnElement[Any]] | None = None,
     ) -> Sequence[ModelType]:
         """
         Получает список записей с пагинацией и опциональной сортировкой.
