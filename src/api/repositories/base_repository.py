@@ -51,13 +51,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db_session.execute(statement)
         instance = result.scalar_one_or_none()
 
-        if instance:
-            log.debug(f"Запись {self.model.__name__} с ID {obj_id} найдена.")
-        else:
-            log.debug(f"Запись {self.model.__name__} с ID {obj_id} не найдена.")
-
-        # is_found = "найдена" if instance else "не найдена"
-        # log.debug(f"Запись {self.model.__name__} с ID {obj_id} {is_found}.")
+        status = "найдена" if instance else "не найдена"
+        log.debug(f"Запись {self.model.__name__} с ID {obj_id} {status}.")
 
         return instance
 
@@ -77,24 +72,13 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType | None: Экземпляр модели или None, если запись не найдена.
         """
-        log.debug(f"Получение записи {self.model.__name__} с фильтрами {filters}")
         statement = select(self.model)
 
         if filters:
             statement = statement.where(*filters)
 
         result = await db_session.execute(statement)
-        instance =  result.scalar_one_or_none()
-
-        if instance:
-            log.debug(f"Запись {self.model.__name__} найдена.")
-        else:
-            log.debug(f"Запись {self.model.__name__} не найдена.")
-
-        # is_found = "найдена" if instance else "не найдена"
-        # log.debug(f"Запись {self.model.__name__} {is_found}.")
-
-        return instance
+        return result.scalar_one_or_none()
 
     async def get_multi(
             self,
@@ -152,10 +136,6 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             Sequence[ModelType]: Список экземпляров модели.
         """
-        log.debug(
-            f"Получение списка записей {self.model.__name__} по фильтрам: {filters} "
-            f"(skip={skip}, limit={limit}, order_by={order_by})"
-        )
         statement = select(self.model)
 
         if filters:
@@ -168,23 +148,22 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         result = await db_session.execute(statement)
         instances = result.scalars().all()
-        log.debug(f"Найдено {len(instances)} записей {self.model.__name__}.")
         return instances
 
-    async def add(self, db_session: AsyncSession, *, db_obj: ModelType) -> ModelType:
-        """
-        Добавляет объект модели в сессию.
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            db_obj (ModelType): Экземпляр модели для добавления.
-
-        Returns:
-            ModelType: Добавленный объект модели.
-        """
-        log.debug(f"Добавление {self.model.__name__} в сессию (ID: {getattr(db_obj, 'id', 'new')})")
-        db_session.add(db_obj)
-        return db_obj
+    # async def add(self, db_session: AsyncSession, *, db_obj: ModelType) -> ModelType:
+    #     """
+    #     Добавляет объект модели в сессию.
+    #
+    #     Args:
+    #         db_session (AsyncSession): Асинхронная сессия базы данных.
+    #         db_obj (ModelType): Экземпляр модели для добавления.
+    #
+    #     Returns:
+    #         ModelType: Добавленный объект модели.
+    #     """
+    #     log.debug(f"Добавление {self.model.__name__} в сессию (ID: {getattr(db_obj, 'id', 'new')})")
+    #     db_session.add(db_obj)
+    #     return db_obj
 
     async def create(self, db_session: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """
@@ -202,7 +181,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         log.debug(f"Подготовка к созданию записи {self.model.__name__} с данными: {obj_in_data}")
         db_obj = self.model(**obj_in_data)
-        await self.add(db_session, db_obj=db_obj)
+        db_session.add(db_obj)
         await db_session.flush()
         await db_session.refresh(db_obj)
         log.info(f"{self.model.__name__} успешно создан.")
@@ -241,7 +220,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             else:
                 log.warning(f"Попытка обновить несуществующее поле '{field}' для {self.model.__name__} ID: {db_obj.id}")
 
-        await self.add(db_session, db_obj=db_obj)
+        db_session.add(db_obj)
         await db_session.flush()
         await db_session.refresh(db_obj)
         log.info(f"{self.model.__name__} с ID: {db_obj.id} успешно обновлен.")

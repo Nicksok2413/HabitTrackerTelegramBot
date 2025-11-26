@@ -59,7 +59,7 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
         limit: int = 100,
     ) -> Sequence[HabitExecution]:
         """
-        Получает список выполнений для конкретной привычки с опциональными фильтрами.
+        Получает список выполнений для конкретной привычки с пагинацией и опциональными фильтрами.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.

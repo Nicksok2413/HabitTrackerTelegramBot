@@ -26,12 +26,11 @@ class UserRepository(BaseRepository[User, UserSchemaCreate, UserSchemaUpdate]):
         Returns:
             User | None: Экземпляр модели User или None, если пользователь не найден.
         """
+        log.debug(f"Получение пользователя по Telegram ID: {telegram_id}")
         user = await self.get_by_filter_first_or_none(db_session, self.model.telegram_id == telegram_id)
 
-        if user:
-            log.debug(f"Пользователь с Telegram ID {telegram_id} найден (ID: {user.id}).")
-        else:
-            log.debug(f"Пользователь с Telegram ID {telegram_id} не найден.")
+        status = f"найден (ID: {user.id})" if user else "не найден"
+        log.debug(f"Пользователь с Telegram ID {telegram_id} {status}.")
 
         return user
 
@@ -53,10 +52,8 @@ class UserRepository(BaseRepository[User, UserSchemaCreate, UserSchemaUpdate]):
         log.debug(f"Получение пользователя по Username: {username}")
         user = await self.get_by_filter_first_or_none(db_session, self.model.username == username)
 
-        if user:
-            log.debug(f"Пользователь с Username {username} найден (ID: {user.id}).")
-        else:
-            log.debug(f"Пользователь с Username {username} не найден.")
+        status = f"найден (ID: {user.id})" if user else "не найден"
+        log.debug(f"Пользователь с Username {username} {status}.")
 
         return user
 

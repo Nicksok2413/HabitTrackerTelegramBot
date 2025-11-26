@@ -41,6 +41,10 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         Returns:
             Sequence[Habit]: Список привычек пользователя.
         """
+        log.debug(
+            f"Получение привычек для пользователя ID: {user_id}, "
+            f"skip={skip}, limit={limit}, active_only={active_only})"
+        )
 
         # Явно указываем тип списка: list[ColumnElement[bool]]
         # Это говорит mypy, что внутри лежат SQL-выражения, возвращающие булево значение (WHERE ...)
@@ -83,12 +87,16 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
             .where(self.model.id == habit_id)
             .options(selectinload(self.model.executions))  # Жадная загрузка выполнений
         )
-
         result = await db_session.execute(statement)
-        return result.scalar_one_or_none()
+        habit = result.scalar_one_or_none()
+
+        status = "найдена" if habit else "не найдена"
+        log.debug(f"Привычка (ID {habit_id}) с загруженными выполнениями {status}.")
+
+        return habit
 
 
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
 # для использования планировщиком, если планировщик будет обращаться к API,
 # либо если логика планировщика будет в API сервисе.
-# Если планировщик работает напрямую с БД, такие методы в API репозитории могут не понадобиться.
+# Если планировщик работает напрямую с БД, такие методы в API репозитории не понадобятся.
