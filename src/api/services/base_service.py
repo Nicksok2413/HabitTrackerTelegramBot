@@ -5,7 +5,7 @@
 и валидацию данных перед передачей в репозиторий.
 """
 
-from typing import Any, Generic, TypeVar, Sequence, cast
+from typing import Any, Generic, Sequence, TypeVar, cast
 
 from pydantic import BaseModel
 from sqlalchemy import ColumnElement, asc, desc
@@ -45,9 +45,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         """
         self.repository = repository
 
-    def _get_order_by_clause(
-            self, sort_by: str | None, descending: bool = False
-    ) -> list[ColumnElement[Any]] | None:
+    def _get_order_by_clause(self, sort_by: str | None, descending: bool = False) -> list[ColumnElement[Any]] | None:
         """
         Формирует список выражений для сортировки SQLAlchemy на основе строкового имени поля.
 
@@ -78,7 +76,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             raise BadRequestException(
                 message=f"Некорректное поле для сортировки: '{sort_by}'. Доступные поля: {available_columns}",
                 error_type="invalid_sort_field",
-                loc=["query", "sort_by"]
+                loc=["query", "sort_by"],
             )
 
         field = getattr(self.repository.model, sort_by)
@@ -113,17 +111,17 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
                 error_type=f"{model_name.lower()}_not_found",
             )
 
-        # Явное приведение типа для mypy
-        return cast(ModelType, db_obj)
+        # Возвращаем найденный объект
+        return cast(ModelType, db_obj)  # Явное приведение типа для mypy
 
     async def get_list(
-            self,
-            db_session: AsyncSession,
-            *,
-            skip: int = 0,
-            limit: int = 100,
-            sort_by: str | None = None,
-            descending: bool = False,
+        self,
+        db_session: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        sort_by: str | None = None,
+        descending: bool = False,
     ) -> Sequence[ModelType]:
         """
         Получает список объектов с поддержкой пагинации и динамической сортировки.
@@ -162,7 +160,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
             # Возвращаем созданный объект
-            return db_obj
+            return cast(ModelType, db_obj)  # Явное приведение типа для mypy
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
@@ -207,7 +205,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
             # Возвращаем обновленный объект
-            return updated_obj
+            return cast(ModelType, updated_obj)  # Явное приведение типа для mypy
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()

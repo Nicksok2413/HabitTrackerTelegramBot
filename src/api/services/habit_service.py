@@ -53,11 +53,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
         try:
             # Репозиторий добавляет объект привычки в сессию и делает flush (получает ID)
-            habit = await self.repository.create_habit(
-                db_session,
-                habit_in=habit_in,
-                user_id=current_user.id
-            )
+            habit = await self.repository.create_habit(db_session, habit_in=habit_in, user_id=current_user.id)
             # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
             # Возвращаем созданный объект привычки
@@ -68,7 +64,6 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             # Логируем ошибку и выбрасываем исключение
             log.error(f"Ошибка при создании привычки для пользователя ID: {current_user.id}: {exc}", exc_info=True)
             raise exc
-
 
     async def get_habit_by_id_for_user(self, db_session: AsyncSession, *, habit_id: int, current_user: User) -> Habit:
         """
@@ -201,7 +196,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
     async def remove_habit_for_user(
         self, db_session: AsyncSession, *, habit_id: int, current_user: User
-    ) -> Habit | None:
+    ) -> None:
         """
         Удаляет привычку, проверяя, что она принадлежит текущему пользователю.
 
@@ -209,9 +204,6 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             db_session (AsyncSession): Асинхронная сессия базы данных.
             habit_id (int): ID привычки для удаления.
             current_user (User): Аутентифицированный пользователь.
-
-        Returns:
-            Habit | None: Удаленная привычка.
         """
         log.info(f"Удаление привычки ID: {habit_id} для пользователя ID: {current_user.id}")
         habit_to_remove = await self.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)

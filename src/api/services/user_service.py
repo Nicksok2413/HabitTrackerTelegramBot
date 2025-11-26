@@ -3,7 +3,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.core.exceptions import NotFoundException
-from src.api.core.logging import api_log as log
 from src.api.models import User
 from src.api.repositories import UserRepository
 from src.api.schemas import UserSchemaCreate, UserSchemaUpdate
