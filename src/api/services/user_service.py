@@ -38,8 +38,20 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
         Returns:
             User | None: Объект пользователя или None, если не найден.
         """
-        log.info(f"Получение пользователя по Telegram ID: {telegram_id}")
         return await self.repository.get_by_telegram_id(db_session, telegram_id=telegram_id)
+
+    async def get_user_by_username(self, db_session: AsyncSession, *, username: str) -> User | None:
+        """
+        Получает пользователя по его Username (если он есть).
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            username (str): Имя пользователя в Telegram.
+
+        Returns:
+            User | None: Объект пользователя или None, если не найден.
+        """
+        return await self.repository.get_by_username(db_session, username=username)
 
     async def get_or_create_user(self, db_session: AsyncSession, *, user_in: UserSchemaCreate) -> User:
         """
@@ -47,17 +59,19 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
-            user_in (UserSchemaCreate): Данные пользователя для создания или поиска.
+            user_in (UserSchemaCreate): Данные пользователя для поиска или создания.
 
         Returns:
-            User: Существующий или вновь созданный пользователь.
+            User: Существующий или созданный пользователь.
         """
+        # Проверяем существования пользователя
         existing_user = await self.repository.get_by_telegram_id(db_session, telegram_id=user_in.telegram_id)
 
+        # Если пользователь существует, возвращаем его
         if existing_user:
             return existing_user
 
-        # Используем метод create из BaseService, который управляет транзакцией
+        # Если пользователя нет, создаем нового пользователя
         return await super().create(db_session, obj_in=user_in)
 
     async def update_user_by_telegram_id(
@@ -81,16 +95,17 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
         Raises:
             NotFoundException: Если пользователь с указанным Telegram ID не найден.
         """
-        log.info(f"Обновление пользователя по Telegram ID: {telegram_id}")
+        # Проверяем существования пользователя
         user_to_update = await self.repository.get_by_telegram_id(db_session, telegram_id=telegram_id)
 
+        # Если пользователя нет, выбрасываем ошибку
         if not user_to_update:
             raise NotFoundException(
                 message=f"Пользователь с Telegram ID {telegram_id} не найден.",
                 error_type="user_not_found",
             )
 
-        # Используем метод update из BaseService
+        # Обновляем пользователя
         return await super().update(db_session, obj_id=user_to_update.id, obj_in=user_update_data)
 
     # Другие специфичные для пользователя методы, если нужны...
