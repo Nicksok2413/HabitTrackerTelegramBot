@@ -225,4 +225,4 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         habit_to_remove = await self.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
         # Используем метод remove из BaseService
-        return await super().remove(db_session, obj_id=habit_to_remove.id)
+        return await super().delete(db_session, obj_id=habit_to_remove.id)
