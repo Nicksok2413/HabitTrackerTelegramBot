@@ -102,8 +102,10 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Raises:
             NotFoundException: Если объект с указанным ID не найден.
         """
+        # Проверка существования объекта
         db_obj = await self.repository.get_by_id(db_session, obj_id=obj_id)
 
+        # Если объект не найден, выбрасываем исключение
         if not db_obj:
             model_name = self.repository.model.__name__
             raise NotFoundException(

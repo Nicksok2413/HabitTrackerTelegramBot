@@ -48,38 +48,27 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         Returns:
             Habit: Созданная привычка.
         """
-        log.info(f"Создание привычки '{habit_in.name}' для пользователя ID: {current_user.id}")
-
-        # Устанавливаем target_days из настроек, если не передано в схеме
-        target_days = habit_in.target_days if habit_in.target_days is not None else settings.DAYS_TO_FORM_HABIT
-
-        # Создаем объект модели Habit напрямую, чтобы добавить user_id и настроенный target_days
-        # BaseRepository.create ожидает схему, а нам нужно добавить user_id
-        habit_model_data = habit_in.model_dump(
-            exclude_unset=True, exclude={"target_days"}
-        )  # Исключаем target_days, если он None
-
-        db_habit = self.repository.model(
-            **habit_model_data,
-            user_id=current_user.id,
-            target_days=target_days,  # Используем рассчитанное значение
-        )
-
-        # await self.repository.add(db_session, db_obj=db_habit)
+        # Устанавливаем target_days из настроек, если в переданных данных - None
+        habit_in.target_days = habit_in.target_days if habit_in.target_days else settings.DAYS_TO_FORM_HABIT
 
         try:
-            await db_session.flush()
-            await db_session.refresh(db_habit)
-            await db_session.commit()
-            log.info(f"Привычка (ID: {db_habit.id}) успешно создана для пользователя ID: {current_user.id}.")
-        except Exception as exc:
-            log.error(
-                f"Ошибка при создании привычки для пользователя ID: {current_user.id}: {exc}",
-                exc_info=True,
+            # Репозиторий добавляет объект привычки в сессию и делает flush (получает ID)
+            habit = await self.repository.create_habit(
+                db_session,
+                habit_in=habit_in,
+                user_id=current_user.id
             )
+            # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
+            await db_session.commit()
+            # Возвращаем созданный объект привычки
+            return habit
+        except Exception as exc:
+            # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
-            raise
-        return db_habit
+            # Логируем ошибку и выбрасываем исключение
+            log.error(f"Ошибка при создании привычки для пользователя ID: {current_user.id}: {exc}", exc_info=True)
+            raise exc
+
 
     async def get_habit_by_id_for_user(self, db_session: AsyncSession, *, habit_id: int, current_user: User) -> Habit:
         """
@@ -97,15 +86,17 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             NotFoundException: Если привычка не найдена.
             ForbiddenException: Если привычка не принадлежит пользователю.
         """
-        log.info(f"Получение привычки ID: {habit_id} для пользователя ID: {current_user.id}")
+        # Проверка существования привычки
         habit = await self.repository.get_by_id(db_session, obj_id=habit_id)
 
+        # Если объект привычки не найден, выбрасываем исключение
         if not habit:
             raise NotFoundException(
                 message=f"Привычка с ID {habit_id} не найдена.",
                 error_type="habit_not_found",
             )
 
+        # Если пользователи не совпадают, логируем и выбрасываем исключение
         if habit.user_id != current_user.id:
             log.warning(f"Пользователь ID: {current_user.id} пытался получить доступ к чужой привычке ID: {habit_id}")
             raise ForbiddenException(
@@ -113,6 +104,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
                 error_type="habit_access_forbidden",
             )
 
+        # Возвращаем найденный объект привычки
         return habit
 
     async def get_habit_with_executions_for_user(
