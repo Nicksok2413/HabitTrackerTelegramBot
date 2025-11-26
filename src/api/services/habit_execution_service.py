@@ -203,7 +203,7 @@ class HabitExecutionService(
             previous_status = existing_execution.status
             existing_execution.status = execution_in.status
             db_execution = existing_execution
-            await self.repository.add(db_session, db_obj=db_execution)  # Пометить как измененный
+            # await self.repository.add(db_session, db_obj=db_execution)  # Пометить как измененный
         else:
             log.debug(f"Создание новой записи о выполнении для привычки ID: {habit_id} на {target_date}")
             db_execution = self.repository.model(
@@ -211,7 +211,7 @@ class HabitExecutionService(
                 execution_date=target_date,
                 status=execution_in.status,
             )
-            await self.repository.add(db_session, db_obj=db_execution)
+            # await self.repository.add(db_session, db_obj=db_execution)
 
         streaks_were_updated = await self._update_habit_streaks(
             habit=habit,

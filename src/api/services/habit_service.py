@@ -65,7 +65,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             target_days=target_days,  # Используем рассчитанное значение
         )
 
-        await self.repository.add(db_session, db_obj=db_habit)
+        # await self.repository.add(db_session, db_obj=db_habit)
 
         try:
             await db_session.flush()
