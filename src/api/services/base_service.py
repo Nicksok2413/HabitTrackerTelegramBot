@@ -1,30 +1,36 @@
-"""Базовый класс для сервисов."""
+"""
+Базовый класс для сервисов.
 
-from typing import Any, Generic, TypeVar, cast
+Реализует основную бизнес-логику CRUD операций, управление транзакциями
+и валидацию данных перед передачей в репозиторий.
+"""
+
+from typing import Any, Generic, TypeVar, Sequence, cast
 
 from pydantic import BaseModel
+from sqlalchemy import ColumnElement, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.exceptions import NotFoundException
+from src.api.core.exceptions import BadRequestException, NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Base as SQLAlchemyBaseModel
 from src.api.repositories import BaseRepository
 
-# Обобщенные (Generic) типы
-ModelType = TypeVar("ModelType", bound=SQLAlchemyBaseModel)
-RepositoryType = TypeVar("RepositoryType", bound=BaseRepository)
-CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
-UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+# Определяем обобщенные (Generic) типы для моделей SQLAlchemy, репозиториев и схем Pydantic
+ModelType = TypeVar("ModelType", bound=SQLAlchemyBaseModel)  # SQLAlchemy модель
+RepositoryType = TypeVar("RepositoryType", bound=BaseRepository)  # Репозиторий
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)  # Pydantic схема для создания
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)  # Pydantic схема для обновления
 
 
 class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSchemaType]):
     """
-    Базовый сервис с общими операциями.
+    Базовый сервис с общими операциями и управлением транзакциями.
 
     Этот класс предназначен для наследования конкретными сервисами.
     Он предоставляет общую логику для CRUD операций, используя репозиторий.
     Управление транзакциями (commit, rollback) предполагается на уровне
-    конкретных методов сервиса, которые представляют собой "единицу работы".
+    конкретных методов сервиса, которые представляют собой "единицу работы (Unit of Work)".
 
     Attributes:
         repository (RepositoryType): Экземпляр репозитория для работы с данными.
@@ -39,9 +45,52 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         """
         self.repository = repository
 
+    def _get_order_by_clause(
+            self, sort_by: str | None, descending: bool = False
+    ) -> list[ColumnElement[Any]] | None:
+        """
+        Формирует список выражений для сортировки SQLAlchemy на основе строкового имени поля.
+
+        Проверяет, существует ли указанное поле в модели, чтобы предотвратить
+        ошибки выполнения или попытки сортировки по недопустимым полям.
+
+        Args:
+            sort_by (str | None): Строковое имя поля модели для сортировки.
+            descending (bool): Флаг направления сортировки (True для DESC, False для ASC).
+
+        Returns:
+            list[ColumnElement[Any]] | None: Список выражений для order_by или None.
+                                                       (например, [self.repository.model.created_at.desc()]).
+
+        Raises:
+            BadRequestException: Если указанного поля не существует в модели.
+        """
+        if not sort_by:
+            return None
+
+        # Проверяем наличие поля в модели
+        if not hasattr(self.repository.model.__table__.columns, sort_by):
+            model_name = self.repository.model.__name__
+            log.warning(f"Попытка сортировки по несуществующему полю '{sort_by}' в модели {model_name}")
+
+            # Получаем список доступных колонок для подсказки в ошибке
+            available_columns = list(self.repository.model.__table__.columns.keys())
+            raise BadRequestException(
+                message=f"Некорректное поле для сортировки: '{sort_by}'. Доступные поля: {available_columns}",
+                error_type="invalid_sort_field",
+                loc=["query", "sort_by"]
+            )
+
+        field = getattr(self.repository.model, sort_by)
+
+        # Формируем выражение сортировки
+        order_expression = desc(field) if descending else asc(field)
+
+        return [order_expression]
+
     async def get_by_id(self, db_session: AsyncSession, *, obj_id: int) -> ModelType:
         """
-        Получает объект по ID.
+        Получает объект по ID или выбрасывает исключение, если объект не найден.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
@@ -56,17 +105,47 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         db_obj = await self.repository.get_by_id(db_session, obj_id=obj_id)
 
         if not db_obj:
+            model_name = self.repository.model.__name__
             raise NotFoundException(
-                message=f"{self.repository.model.__name__} с ID {obj_id} не найден.",
-                error_type=f"{self.repository.model.__name__.lower()}_not_found",
+                message=f"{model_name} с ID {obj_id} не найден.",
+                error_type=f"{model_name.lower()}_not_found",
             )
 
-        # Явное приведение типа для Mypy
+        # Явное приведение типа для mypy
         return cast(ModelType, db_obj)
+
+    async def get_list(
+            self,
+            db_session: AsyncSession,
+            *,
+            skip: int = 0,
+            limit: int = 100,
+            sort_by: str | None = None,
+            descending: bool = False,
+    ) -> Sequence[ModelType]:
+        """
+        Получает список объектов с поддержкой пагинации и динамической сортировки.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            skip (int): Количество записей для пропуска.
+            limit (int): Максимальное количество записей.
+            sort_by (str | None): Поле для сортировки.
+            descending (bool): Сортировать по убыванию.
+
+        Returns:
+            Sequence[ModelType]: Список объектов.
+        """
+        # Преобразуем строковые параметры сортировки в выражения SQLAlchemy
+        order_by_clause = self._get_order_by_clause(sort_by, descending)
+
+        return await self.repository.get_multi(db_session, skip=skip, limit=limit, order_by=order_by_clause)
 
     async def create(self, db_session: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """
         Создает новый объект.
+
+        Управляет транзакцией: выполняет commit в случае успеха или rollback при ошибке.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
@@ -75,22 +154,20 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Returns:
             ModelType: Созданный объект.
         """
-        db_obj = await self.repository.create(db_session, obj_in=obj_in)
-
         try:
-            await db_session.flush()  # Получаем ID и другие сгенерированные БД значения
-            await db_session.refresh(db_obj)  # Обновляем объект из БД
-            await db_session.commit()  # Фиксируем транзакцию
+            # Репозиторий добавляет объект в сессию и делает flush (получает ID)
+            db_obj = await self.repository.create(db_session, obj_in=obj_in)
+            # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
+            await db_session.commit()
+            # Возвращаем созданный объект
+            return db_obj
         except Exception as exc:
-            log.error(
-                f"Ошибка при создании {self.repository.model.__name__}: {exc}",
-                exc_info=True,
-            )
+            # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
-            raise
-
-        # Явное приведение типа для Mypy
-        return cast(ModelType, db_obj)
+            # Логируем ошибку и выбрасываем исключение
+            model_name = self.repository.model.__name__
+            log.error(f"Ошибка при создании {model_name}: {exc}", exc_info=True)
+            raise exc
 
     async def update(
         self,
@@ -101,7 +178,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         **kwargs: Any,
     ) -> ModelType:
         """
-        Обновляет существующий объект по ID.
+        Обновляет существующий объект по ID или выбрасывает исключение, если объект не найден.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
@@ -119,74 +196,53 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         # Проверка существования и получение объекта
         db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
-        # Здесь могут быть дополнительные проверки прав доступа, используя **kwargs,
+        # Здесь можно добавить дополнительные проверки прав доступа, используя **kwargs,
         # например, проверка, что user_id из JWT совпадает с user_id объекта
 
-        updated_obj = await self.repository.update(db_session, db_obj=db_obj, obj_in=obj_in)
-
         try:
-            await db_session.flush()
-            await db_session.refresh(updated_obj)
+            # Репозиторий добавляет объект в сессию и делает flush (получает ID)
+            updated_obj = await self.repository.update(db_session, db_obj=db_obj, obj_in=obj_in)
+            # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
+            # Возвращаем обновленный объект
+            return updated_obj
         except Exception as exc:
-            log.error(
-                f"Ошибка при обновлении {self.repository.model.__name__} (ID: {obj_id}): {exc}",
-                exc_info=True,
-            )
+            # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
-            raise
+            # Логируем ошибку и выбрасываем исключение
+            model_name = self.repository.model.__name__
+            log.error(f"Ошибка при обновлении {model_name} (ID: {obj_id}): {exc}", exc_info=True)
+            raise exc
 
-        # Явное приведение типа для Mypy
-        return cast(ModelType, updated_obj)
-
-    async def remove(self, db_session: AsyncSession, *, obj_id: int, **kwargs: Any) -> ModelType | None:
+    async def delete(self, db_session: AsyncSession, *, obj_id: int, **kwargs: Any) -> None:
         """
-        Находит объект по ID и удаляет его.
+        Находит объект по ID и удаляет его или выбрасывает исключение, если объект не найден.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
             obj_id (int): ID объекта для удаления.
             **kwargs: Дополнительные аргументы для проверок.
 
-        Returns:
-            ModelType | None: Удаленный объект или None, если не найден.
-
         Raises:
             NotFoundException: Если объект для удаления не найден.
         """
-        log.debug(f"Подготовка к удалению {self.repository.model.__name__} по ID: {obj_id}")
+        # Проверка существования и получение объекта
         db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
-        # Здесь могут быть дополнительные проверки прав доступа
+        # Здесь можно добавить дополнительные проверки прав доступа
 
-        # Помечаем объект на удаление
-        await self.repository.remove(db_session, db_obj=db_obj)
+        model_name = self.repository.model.__name__
 
         try:
-            # Фиксируем удаление
+            # Репозиторий помечает объект на удаление
+            await self.repository.remove(db_session, db_obj=db_obj)
+            # Сервис фиксирует удаление объекта
             await db_session.commit()
-            log.info(f"{self.repository.model.__name__} (ID: {obj_id}) успешно удален.")
+            # Логируем успешное удаление объекта
+            log.info(f"{model_name} (ID: {obj_id}) успешно удален.")
         except Exception as exc:
-            log.error(
-                f"Ошибка при удалении {self.repository.model.__name__} (ID: {obj_id}): {exc}",
-                exc_info=True,
-            )
+            # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
-            raise
-
-        return db_obj
-
-    async def get_list(self, db_session: AsyncSession, *, skip: int = 0, limit: int = 100) -> list[ModelType]:
-        """
-        Получает список объектов с пагинацией.
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            skip (int): Количество записей для пропуска.
-            limit (int): Максимальное количество записей.
-
-        Returns:
-            list[ModelType]: Список объектов.
-        """
-        items = await self.repository.get_multi(db_session, skip=skip, limit=limit)
-        return list(items)
+            # Логируем ошибку и выбрасываем исключение
+            log.error(f"Ошибка при удалении {model_name} (ID: {obj_id}): {exc}", exc_info=True)
+            raise exc
