@@ -1,6 +1,6 @@
 """Базовый репозиторий с общими CRUD-операциями."""
 
-from typing import Any, Generic, Sequence, Type, TypeVar
+from typing import Any, Generic, Sequence, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy import ColumnElement, select
@@ -10,9 +10,9 @@ from src.api.core.logging import api_log as log
 from src.api.models import Base as SQLAlchemyBaseModel
 
 # Определяем обобщенные (Generic) типы для моделей SQLAlchemy и схем Pydantic
-ModelType = TypeVar("ModelType", bound=SQLAlchemyBaseModel)
-CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
-UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+ModelType = TypeVar("ModelType", bound=SQLAlchemyBaseModel)  # SQLAlchemy модель
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)  # Pydantic схема для создания
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)  # Pydantic схема для обновления
 
 
 class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
@@ -26,12 +26,12 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         model: Класс модели SQLAlchemy, с которым работает репозиторий.
     """
 
-    def __init__(self, model: Type[ModelType]):
+    def __init__(self, model: type[ModelType]):
         """
         Инициализирует базовый репозиторий.
 
         Args:
-            model (Type[ModelType]): Класс модели SQLAlchemy.
+            model (ModelType): Класс модели SQLAlchemy.
         """
         self.model = model
 
@@ -46,15 +46,18 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType | None: Экземпляр модели или None, если запись не найдена.
         """
-        log.debug(f"Получение {self.model.__name__} по ID: {obj_id}")
+        log.debug(f"Получение записи {self.model.__name__} по ID: {obj_id}")
         statement = select(self.model).where(self.model.id == obj_id)
         result = await db_session.execute(statement)
         instance = result.scalar_one_or_none()
 
         if instance:
-            log.debug(f"{self.model.__name__} с ID {obj_id} найден.")
+            log.debug(f"Запись {self.model.__name__} с ID {obj_id} найдена.")
         else:
-            log.debug(f"{self.model.__name__} с ID {obj_id} не найден.")
+            log.debug(f"Запись {self.model.__name__} с ID {obj_id} не найдена.")
+
+        # is_found = "найдена" if instance else "не найдена"
+        # log.debug(f"Запись {self.model.__name__} с ID {obj_id} {is_found}.")
 
         return instance
 
@@ -74,28 +77,53 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType | None: Экземпляр модели или None, если запись не найдена.
         """
+        log.debug(f"Получение записи {self.model.__name__} с фильтрами {filters}")
         statement = select(self.model)
 
         if filters:
             statement = statement.where(*filters)
 
         result = await db_session.execute(statement)
-        return result.scalar_one_or_none()
+        instance =  result.scalar_one_or_none()
 
-    async def get_multi(self, db_session: AsyncSession, *, skip: int = 0, limit: int = 100) -> Sequence[ModelType]:
+        if instance:
+            log.debug(f"Запись {self.model.__name__} найдена.")
+        else:
+            log.debug(f"Запись {self.model.__name__} не найдена.")
+
+        # is_found = "найдена" if instance else "не найдена"
+        # log.debug(f"Запись {self.model.__name__} {is_found}.")
+
+        return instance
+
+    async def get_multi(
+            self,
+            db_session: AsyncSession,
+            *,
+            skip: int = 0,
+            limit: int = 100,
+            order_by: list[ColumnElement[Any]] | None = None,
+    ) -> Sequence[ModelType]:
         """
-        Получает список записей с пагинацией.
+        Получает список записей с пагинацией и опциональной сортировкой.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
             skip (int): Количество записей, которое нужно пропустить.
             limit (int): Максимальное количество записей для возврата.
+            order_by (list[ColumnElement[Any]] | None): Список полей для сортировки
+                                                       (например, [self.model.created_at.desc()]).
 
         Returns:
             Sequence[ModelType]: Список экземпляров модели.
         """
-        log.debug(f"Получение списка {self.model.__name__} (skip={skip}, limit={limit})")
-        statement = select(self.model).offset(skip).limit(limit)
+        log.debug(f"Получение списка записей {self.model.__name__}: (skip={skip}, limit={limit}, order_by={order_by})")
+        statement = select(self.model)
+
+        if order_by:
+            statement = statement.order_by(*order_by)
+
+        statement = statement.offset(skip).limit(limit)
         result = await db_session.execute(statement)
         instances = result.scalars().all()
         log.debug(f"Найдено {len(instances)} записей {self.model.__name__}.")
@@ -125,7 +153,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             Sequence[ModelType]: Список экземпляров модели.
         """
         log.debug(
-            f"Получение списка {self.model.__name__} по фильтрам: {filters} "
+            f"Получение списка записей {self.model.__name__} по фильтрам: {filters} "
             f"(skip={skip}, limit={limit}, order_by={order_by})"
         )
         statement = select(self.model)
@@ -133,14 +161,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if filters:
             statement = statement.where(*filters)
 
-        if order_by is not None:
+        if order_by:
             statement = statement.order_by(*order_by)
 
         statement = statement.offset(skip).limit(limit)
 
         result = await db_session.execute(statement)
         instances = result.scalars().all()
-        log.debug(f"Найдено {len(instances)} записей {self.model.__name__} по фильтрам.")
+        log.debug(f"Найдено {len(instances)} записей {self.model.__name__}.")
         return instances
 
     async def add(self, db_session: AsyncSession, *, db_obj: ModelType) -> ModelType:
@@ -169,10 +197,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType: Созданный экземпляр модели.
         """
+        # Конвертируем в словарь
         obj_in_data = obj_in.model_dump()
-        log.debug(f"Подготовка к созданию {self.model.__name__} с данными: {obj_in_data}")
+
+        log.debug(f"Подготовка к созданию записи {self.model.__name__} с данными: {obj_in_data}")
         db_obj = self.model(**obj_in_data)
         await self.add(db_session, db_obj=db_obj)
+        await db_session.flush()
+        await db_session.refresh(db_obj)
         log.info(f"{self.model.__name__} успешно создан.")
         return db_obj
 
@@ -194,14 +226,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType: Обновленный экземпляр модели.
         """
-        log.debug(f"Обновление {self.model.__name__} с ID: {db_obj.id}")
+        log.debug(f"Обновление записи {self.model.__name__} с ID: {db_obj.id}")
 
-        if isinstance(obj_in, BaseModel):
-            # exclude_unset=True для частичного обновления
-            update_data = obj_in.model_dump(exclude_unset=True)
-        else:
+        # Конвертируем в словарь, исключая None значения (чтобы не затереть данные пустыми полями)
+        if isinstance(obj_in, dict):
             update_data = obj_in
+        else:
+            update_data = obj_in.model_dump(exclude_unset=True)  # exclude_unset=True для частичного обновления
 
+        # Обновляем поля модели
         for field, value in update_data.items():
             if hasattr(db_obj, field):
                 setattr(db_obj, field, value)
@@ -209,6 +242,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 log.warning(f"Попытка обновить несуществующее поле '{field}' для {self.model.__name__} ID: {db_obj.id}")
 
         await self.add(db_session, db_obj=db_obj)
+        await db_session.flush()
+        await db_session.refresh(db_obj)
         log.info(f"{self.model.__name__} с ID: {db_obj.id} успешно обновлен.")
         return db_obj
 
@@ -221,5 +256,6 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db_obj (ModelType): Объект для удаления.
         """
 
-        log.debug(f"Пометка на удаление {self.model.__name__} (ID: {getattr(db_obj, 'id', 'N/A')})")
-        return await db_session.delete(db_obj)
+        log.debug(f"Пометка на удаление записи {self.model.__name__} (ID: {getattr(db_obj, 'id', 'N/A')})")
+        await db_session.delete(db_obj)
+        await db_session.flush()
