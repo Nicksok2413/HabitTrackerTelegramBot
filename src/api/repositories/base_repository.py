@@ -150,21 +150,6 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         instances = result.scalars().all()
         return instances
 
-    # async def add(self, db_session: AsyncSession, *, db_obj: ModelType) -> ModelType:
-    #     """
-    #     Добавляет объект модели в сессию.
-    #
-    #     Args:
-    #         db_session (AsyncSession): Асинхронная сессия базы данных.
-    #         db_obj (ModelType): Экземпляр модели для добавления.
-    #
-    #     Returns:
-    #         ModelType: Добавленный объект модели.
-    #     """
-    #     log.debug(f"Добавление {self.model.__name__} в сессию (ID: {getattr(db_obj, 'id', 'new')})")
-    #     db_session.add(db_obj)
-    #     return db_obj
-
     async def create(self, db_session: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """
         Создает и добавляет новый объект в сессию на основе Pydantic схемы.
@@ -179,12 +164,19 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         # Конвертируем в словарь
         obj_in_data = obj_in.model_dump()
 
+        # Подготавливаем объект
         log.debug(f"Подготовка к созданию записи {self.model.__name__} с данными: {obj_in_data}")
         db_obj = self.model(**obj_in_data)
+
+        # Добавляем объект в сессию
         db_session.add(db_obj)
+        # Получаем ID и другие сгенерированные базой данных значения
         await db_session.flush()
+        # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
+        # Логируем успешное создание объекта
         log.info(f"{self.model.__name__} успешно создан.")
+        # Возвращаем созданный объект
         return db_obj
 
     async def update(
@@ -220,10 +212,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             else:
                 log.warning(f"Попытка обновить несуществующее поле '{field}' для {self.model.__name__} ID: {db_obj.id}")
 
+        # Добавляем объект в сессию
         db_session.add(db_obj)
+        # Получаем ID и другие сгенерированные базой данных значения
         await db_session.flush()
+        # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
+        # Логируем успешное обновление объекта
         log.info(f"{self.model.__name__} с ID: {db_obj.id} успешно обновлен.")
+        # Возвращаем обновленный объект
         return db_obj
 
     async def remove(self, db_session: AsyncSession, *, db_obj: ModelType) -> None:
