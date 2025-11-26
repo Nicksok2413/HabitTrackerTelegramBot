@@ -57,6 +57,7 @@ async def login_for_access_token(
         username=request_data.username,
         first_name=request_data.first_name,
         last_name=request_data.last_name,
+        timezone=request_data.timezone or "UTC",  # Если пришло None, то по умолчанию "UTC"
         # is_active и is_bot_blocked будут по умолчанию из модели User
     )
 

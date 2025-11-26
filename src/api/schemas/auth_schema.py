@@ -31,3 +31,4 @@ class BotLoginRequest(BaseModel):
     username: str | None = Field(None, max_length=100, description="Username пользователя (если есть)")
     first_name: str | None = Field(None, max_length=100, description="Имя пользователя (если есть)")
     last_name: str | None = Field(None, max_length=100, description="Фамилия пользователя (если есть)")
+    timezone: str | None = Field(None, max_length=50, description="Часовой пояс пользователя (если есть)")
