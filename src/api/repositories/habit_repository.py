@@ -19,6 +19,46 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
     Наследует общие методы от BaseRepository и содержит специфичные для Habit методы.
     """
 
+    async def create_habit(
+        self,
+        db_session: AsyncSession,
+        *,
+        habit_in: HabitSchemaCreate,
+        user_id: int,
+    ) -> Habit:
+        """
+        Создает новую привычку для указанного пользователя.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            habit_in (HabitSchemaCreate): Данные для создания привычки.
+            user_id (int): ID аутентифицированного пользователя, создающего привычку.
+
+        Returns:
+            Habit: Созданная привычка.
+        """
+        log.info(f"Создание привычки '{habit_in.name}' для пользователя ID: {user_id}")
+
+        # Конвертируем в словарь
+        habit_in_data = habit_in.model_dump()
+
+        # Подготавливаем объект привычки
+        habit_obj = self.model(
+            **habit_in_data,
+            user_id=user_id,
+        )
+
+        # Добавляем объект привычки в сессию
+        db_session.add(habit_obj)
+        # Получаем ID и другие сгенерированные базой данных значения
+        await db_session.flush()
+        # Обновляем объект привычки из базы данных
+        await db_session.refresh(habit_obj)
+        # Логируем успешное создание привычки
+        log.info(f"Привычка (ID: {habit_obj.id}) успешно создана для пользователя ID: {user_id}.")
+        # Возвращаем созданную привычку
+        return habit_obj
+
     async def get_habits_by_user_id(
         self,
         db_session: AsyncSession,
