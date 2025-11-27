@@ -63,12 +63,13 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Raises:
             BadRequestException: Если указанного поля не существует в модели.
         """
+        model_name = self.repository.model.__name__
+
         if not sort_by:
             return None
 
         # Проверяем наличие поля в модели
         if not hasattr(self.repository.model.__table__.columns, sort_by):
-            model_name = self.repository.model.__name__
             log.warning(f"Попытка сортировки по несуществующему полю '{sort_by}' в модели {model_name}")
 
             # Получаем список доступных колонок для подсказки в ошибке
@@ -100,12 +101,13 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Raises:
             NotFoundException: Если объект с указанным ID не найден.
         """
+        model_name = self.repository.model.__name__
+
         # Проверка существования объекта
         db_obj = await self.repository.get_by_id(db_session, obj_id=obj_id)
 
         # Если объект не найден, выбрасываем исключение
         if not db_obj:
-            model_name = self.repository.model.__name__
             raise NotFoundException(
                 message=f"{model_name} с ID {obj_id} не найден.",
                 error_type=f"{model_name.lower()}_not_found",
@@ -154,6 +156,8 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Returns:
             ModelType: Созданный объект.
         """
+        model_name = self.repository.model.__name__
+
         try:
             # Репозиторий добавляет объект в сессию и делает flush (получает ID)
             db_obj = await self.repository.create(db_session, obj_in=obj_in)
@@ -165,7 +169,6 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
             # Логируем ошибку и выбрасываем исключение
-            model_name = self.repository.model.__name__
             log.error(f"Ошибка при создании {model_name}: {exc}", exc_info=True)
             raise exc
 
@@ -193,6 +196,8 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Raises:
             NotFoundException: Если объект для обновления не найден.
         """
+        model_name = self.repository.model.__name__
+
         # Проверка существования и получение объекта
         db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
@@ -210,7 +215,6 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
             # Логируем ошибку и выбрасываем исключение
-            model_name = self.repository.model.__name__
             log.error(f"Ошибка при обновлении {model_name} (ID: {obj_id}): {exc}", exc_info=True)
             raise exc
 
@@ -226,12 +230,12 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         Raises:
             NotFoundException: Если объект для удаления не найден.
         """
+        model_name = self.repository.model.__name__
+
         # Проверка существования и получение объекта
         db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
         # Здесь можно добавить дополнительные проверки прав доступа
-
-        model_name = self.repository.model.__name__
 
         try:
             # Репозиторий помечает объект на удаление
