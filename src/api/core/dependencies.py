@@ -16,9 +16,8 @@ from .exceptions import ForbiddenException, UnauthorizedException
 from .logging import api_log as log
 from .security import verify_and_decode_token
 
-# --- Типизация для инъекции зависимостей ---
+# --- Типизация для инъекции сессии базы данных ---
 
-# Сессия базы данных
 DBSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 
@@ -26,18 +25,21 @@ DBSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 
 def get_habit_repository() -> HabitRepository:
+    """Создает экземпляр репозитория привычек."""
     return HabitRepository(Habit)
 
 
 def get_habit_execution_repository() -> HabitExecutionRepository:
+    """Создает экземпляр репозитория выполнений."""
     return HabitExecutionRepository(HabitExecution)
 
 
 def get_user_repository() -> UserRepository:
+    """Создает экземпляр репозитория пользователей."""
     return UserRepository(User)
 
 
-# Типизация для репозиториев
+# Типизация репозиториев (для использования в аргументах функций)
 HabitRepo = Annotated[HabitRepository, Depends(get_habit_repository)]
 HabitExecutionRepo = Annotated[HabitExecutionRepository, Depends(get_habit_execution_repository)]
 UserRepo = Annotated[UserRepository, Depends(get_user_repository)]
@@ -47,22 +49,32 @@ UserRepo = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def get_habit_service(repository: HabitRepo) -> HabitService:
+    """Создает экземпляр сервиса привычек."""
     return HabitService(habit_repository=repository)
 
 
-# HabitExecutionService зависит от HabitExecutionRepo и HabitRepo
-def get_habit_execution_service(repository: HabitExecutionRepo, habit_repository: HabitRepo) -> HabitExecutionService:
-    return HabitExecutionService(execution_repository=repository, habit_repository=habit_repository)
-
-
 def get_user_service(repository: UserRepo) -> UserService:
+    """Создает экземпляр сервиса пользователей."""
     return UserService(user_repository=repository)
 
 
-# Типизация для сервисов
+# Сначала определяем алиасы для UserSvc и HabitSvc, так как HabitSvc нужен для HabitExecutionSvc
 HabitSvc = Annotated[HabitService, Depends(get_habit_service)]
-HabitExecutionSvc = Annotated[HabitExecutionService, Depends(get_habit_execution_service)]
 UserSvc = Annotated[UserService, Depends(get_user_service)]
+
+
+# HabitExecutionService зависит от HabitExecutionRepo и HabitService
+def get_habit_execution_service(repository: HabitExecutionRepo, habit_service: HabitSvc) -> HabitExecutionService:
+    """
+    Создает экземпляр сервиса выполнений.
+
+    Внедряет HabitService для проверки прав доступа к привычке.
+    """
+    return HabitExecutionService(execution_repository=repository, habit_service=habit_service)
+
+
+# Алиас для сервиса выполнений
+HabitExecutionSvc = Annotated[HabitExecutionService, Depends(get_habit_execution_service)]
 
 # --- Зависимость для получения текущего пользователя ---
 
@@ -71,7 +83,7 @@ api_key_header_auth = APIKeyHeader(name="X-BOT-API-KEY", auto_error=False)
 
 
 async def verify_bot_api_key(
-    api_key: str | None = Security(api_key_header_auth),
+        api_key: str | None = Security(api_key_header_auth),
 ) -> bool:
     """
     Проверяет API-ключ, отправляемый ботом.
@@ -102,7 +114,6 @@ async def verify_bot_api_key(
 # Создаем зависимость, которую можно будет использовать в роутах для защиты эндпоинтов, предназначенных только для бота.
 BotAPIKeyAuth = Annotated[bool, Depends(verify_bot_api_key)]
 
-
 # --- Зависимость для получения текущего пользователя ---
 
 # Схема для JWT Bearer токена
@@ -110,9 +121,9 @@ bearer_schema = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    db_session: DBSession,
-    user_repo: UserRepo,
-    token_credentials: HTTPAuthorizationCredentials | None = Security(bearer_schema),
+        db_session: DBSession,
+        user_repo: UserRepo,
+        token_credentials: HTTPAuthorizationCredentials | None = Security(bearer_schema),
 ) -> User:
     """
     Получает текущего аутентифицированного пользователя на основе JWT токена.
