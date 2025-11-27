@@ -46,13 +46,15 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType | None: Экземпляр модели или None, если запись не найдена.
         """
-        log.debug(f"Получение записи {self.model.__name__} по ID: {obj_id}")
+        model_name = self.model.__name__
+
+        log.debug(f"Получение записи {model_name} по ID: {obj_id}")
         statement = select(self.model).where(self.model.id == obj_id)
         result = await db_session.execute(statement)
         instance = result.scalar_one_or_none()
 
         status = "найдена" if instance else "не найдена"
-        log.debug(f"Запись {self.model.__name__} с ID {obj_id} {status}.")
+        log.debug(f"Запись {model_name} с ID {obj_id} {status}.")
 
         return instance
 
@@ -101,7 +103,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             Sequence[ModelType]: Список экземпляров модели.
         """
-        log.debug(f"Получение списка записей {self.model.__name__}: (skip={skip}, limit={limit}, order_by={order_by})")
+        model_name = self.model.__name__
+
+        log.debug(f"Получение списка записей {model_name}: (skip={skip}, limit={limit}, order_by={order_by})")
         statement = select(self.model)
 
         if order_by:
@@ -110,7 +114,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         statement = statement.offset(skip).limit(limit)
         result = await db_session.execute(statement)
         instances = result.scalars().all()
-        log.debug(f"Найдено {len(instances)} записей {self.model.__name__}.")
+        log.debug(f"Найдено {len(instances)} записей {model_name}.")
         return instances
 
     async def get_multi_by_filter(
@@ -161,11 +165,13 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType: Созданный экземпляр модели.
         """
+        model_name = self.model.__name__
+
         # Конвертируем в словарь
         obj_in_data = obj_in.model_dump()
 
         # Подготавливаем объект
-        log.debug(f"Подготовка к созданию записи {self.model.__name__} с данными: {obj_in_data}")
+        log.debug(f"Подготовка к созданию записи {model_name} с данными: {obj_in_data}")
         db_obj = self.model(**obj_in_data)
 
         # Добавляем объект в сессию
@@ -175,7 +181,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
         # Логируем успешное создание объекта
-        log.info(f"{self.model.__name__} успешно создан.")
+        log.info(f"{model_name} успешно создан.")
         # Возвращаем созданный объект
         return db_obj
 
@@ -197,7 +203,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         Returns:
             ModelType: Обновленный экземпляр модели.
         """
-        log.debug(f"Обновление записи {self.model.__name__} с ID: {db_obj.id}")
+        model_name = self.model.__name__
 
         # Конвертируем в словарь, исключая None значения (чтобы не затереть данные пустыми полями)
         if isinstance(obj_in, dict):
@@ -210,7 +216,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             if hasattr(db_obj, field):
                 setattr(db_obj, field, value)
             else:
-                log.warning(f"Попытка обновить несуществующее поле '{field}' для {self.model.__name__} ID: {db_obj.id}")
+                log.warning(f"Попытка обновить несуществующее поле '{field}' для {model_name} ID: {db_obj.id}")
 
         # Добавляем объект в сессию
         db_session.add(db_obj)
@@ -219,7 +225,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
         # Логируем успешное обновление объекта
-        log.info(f"{self.model.__name__} с ID: {db_obj.id} успешно обновлен.")
+        log.info(f"{model_name} с ID: {db_obj.id} успешно обновлен.")
         # Возвращаем обновленный объект
         return db_obj
 
@@ -231,7 +237,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db_session (AsyncSession): Асинхронная сессия базы данных.
             db_obj (ModelType): Объект для удаления.
         """
+        model_name = self.model.__name__
 
-        log.debug(f"Пометка на удаление записи {self.model.__name__} (ID: {getattr(db_obj, 'id', 'N/A')})")
+        log.debug(f"Пометка на удаление записи {model_name} (ID: {getattr(db_obj, 'id', 'N/A')})")
         await db_session.delete(db_obj)
         await db_session.flush()
