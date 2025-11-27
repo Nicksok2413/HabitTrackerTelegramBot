@@ -14,7 +14,6 @@ from src.api.models import HabitExecution, HabitExecutionStatus
 from src.api.schemas.habit_execution_schema import (
     HabitExecutionSchemaCreate,
     HabitExecutionSchemaRead,
-    HabitExecutionSchemaUpdate,
 )
 
 router = APIRouter(
@@ -47,7 +46,7 @@ async def record_today_habit_execution(
     Фиксирует выполнение привычки на *сегодняшний день*.
 
     - `habit_id` берется из пути.
-    - Статус выполнения (`DONE`, `NOT_DONE`, `SKIPPED`) передается в теле.
+    - Статус выполнения (`DONE`, `NOT_DONE`) передается в теле.
     - Сервис проверяет права доступа и активность привычки.
     - Обновляет или создает запись `HabitExecution` на сегодня.
     - Обновляет `current_streak` и `max_streak` у привычки.
@@ -212,44 +211,44 @@ async def read_habit_execution_details(
     return execution
 
 
-@router.put(
-    "/{execution_id}",
-    response_model=HabitExecutionSchemaRead,
-    status_code=status.HTTP_200_OK,
-    summary="Обновление статуса выполнения привычки",
-    description="Позволяет изменить статус существующей записи о выполнении (например, с PENDING на DONE).",
-)
-async def update_habit_execution_status(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    execution_service: HabitExecutionSvc,
-    status_in: HabitExecutionSchemaUpdate,
-    execution_id: int = Path(..., title="ID Выполнения", gt=0),
-    habit_id: int = HabitIDPath,  # Для проверки контекста
-) -> HabitExecution:
-    """
-    Обновляет статус конкретного выполнения привычки.
-
-    - Проверяет права доступа и принадлежность выполнения к привычке и пользователю.
-    - Стрики обновляются, если изменяется выполнение за сегодняшний день.
-    """
-    log.info(
-        f"Пользователь ID: {current_user.id} обновляет статус выполнения ID: {execution_id} "
-        f"(привычка ID: {habit_id}) на {status_in.status.value}"
-    )
-    # Сначала получаем выполнение, чтобы убедиться, что оно принадлежит нужной привычке
-    # Это будет сделано внутри `get_execution_details`, который вызывается в `update_execution_status` сервиса
-    # Но для явной проверки на уровне роутера можно сделать так:
-    temp_execution = await execution_service.get_execution_details(
-        db_session, execution_id=execution_id, current_user=current_user
-    )
-    if temp_execution.habit_id != habit_id:
-        log.warning(f"Попытка обновить выполнение ID {execution_id}, которое не принадлежит привычке ID {habit_id}.")
-        raise ForbiddenException(message="Выполнение не относится к указанной привычке.")
-
-    return await execution_service.update_execution_status(
-        db_session,
-        execution_id=execution_id,
-        status_in=status_in,
-        current_user=current_user,
-    )
+# @router.put(
+#     "/{execution_id}",
+#     response_model=HabitExecutionSchemaRead,
+#     status_code=status.HTTP_200_OK,
+#     summary="Обновление статуса выполнения привычки",
+#     description="Позволяет изменить статус существующей записи о выполнении (например, с PENDING на DONE).",
+# )
+# async def update_habit_execution_status(
+#     db_session: DBSession,
+#     current_user: CurrentUser,
+#     execution_service: HabitExecutionSvc,
+#     status_in: HabitExecutionSchemaUpdate,
+#     execution_id: int = Path(..., title="ID Выполнения", gt=0),
+#     habit_id: int = HabitIDPath,  # Для проверки контекста
+# ) -> HabitExecution:
+#     """
+#     Обновляет статус конкретного выполнения привычки.
+#
+#     - Проверяет права доступа и принадлежность выполнения к привычке и пользователю.
+#     - Стрики обновляются, если изменяется выполнение за сегодняшний день.
+#     """
+#     log.info(
+#         f"Пользователь ID: {current_user.id} обновляет статус выполнения ID: {execution_id} "
+#         f"(привычка ID: {habit_id}) на {status_in.status.value}"
+#     )
+#     # Сначала получаем выполнение, чтобы убедиться, что оно принадлежит нужной привычке
+#     # Это будет сделано внутри `get_execution_details`, который вызывается в `update_execution_status` сервиса
+#     # Но для явной проверки на уровне роутера можно сделать так:
+#     temp_execution = await execution_service.get_execution_details(
+#         db_session, execution_id=execution_id, current_user=current_user
+#     )
+#     if temp_execution.habit_id != habit_id:
+#         log.warning(f"Попытка обновить выполнение ID {execution_id}, которое не принадлежит привычке ID {habit_id}.")
+#         raise ForbiddenException(message="Выполнение не относится к указанной привычке.")
+#
+#     return await execution_service.update_execution_status(
+#         db_session,
+#         execution_id=execution_id,
+#         status_in=status_in,
+#         current_user=current_user,
+#     )

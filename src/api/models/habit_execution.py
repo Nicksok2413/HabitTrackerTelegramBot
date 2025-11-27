@@ -20,7 +20,6 @@ class HabitExecutionStatus(PyEnum):
     PENDING = "pending"  # Ожидает выполнения (создается на день)
     DONE = "done"  # Выполнено
     NOT_DONE = "not_done"  # Не выполнено (пропущено)
-    SKIPPED = "skipped"  # Пропущено пользователем (уважительная причина)
 
 
 class HabitExecution(Base):
@@ -31,7 +30,7 @@ class HabitExecution(Base):
         id: Первичный ключ (унаследован от Base).
         habit_id: Внешний ключ, связывающий выполнение с привычкой.
         execution_date: Дата, на которую зафиксировано выполнение.
-        status: Статус выполнения (pending, done, not_done, skipped).
+        status: Статус выполнения (pending, done, not_done).
         created_at: Время создания записи (унаследовано от TimestampMixin).
         updated_at: Время последнего обновления записи (унаследовано от TimestampMixin).
         habit: Связь с привычкой, к которой относится это выполнение.

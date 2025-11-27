@@ -23,7 +23,7 @@ class HabitExecutionSchemaCreate(BaseSchema):  # Не наследуем от Ha
     # execution_date будет установлена сервером как текущая дата
     status: HabitExecutionStatus = Field(
         ...,
-        description="Статус выполнения на сегодня (например, DONE, NOT_DONE, SKIPPED)",
+        description="Статус выполнения на сегодня (например, DONE, NOT_DONE)",
     )
 
 

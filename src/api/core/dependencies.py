@@ -83,7 +83,7 @@ api_key_header_auth = APIKeyHeader(name="X-BOT-API-KEY", auto_error=False)
 
 
 async def verify_bot_api_key(
-        api_key: str | None = Security(api_key_header_auth),
+    api_key: str | None = Security(api_key_header_auth),
 ) -> bool:
     """
     Проверяет API-ключ, отправляемый ботом.
@@ -121,9 +121,9 @@ bearer_schema = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-        db_session: DBSession,
-        user_repo: UserRepo,
-        token_credentials: HTTPAuthorizationCredentials | None = Security(bearer_schema),
+    db_session: DBSession,
+    user_repo: UserRepo,
+    token_credentials: HTTPAuthorizationCredentials | None = Security(bearer_schema),
 ) -> User:
     """
     Получает текущего аутентифицированного пользователя на основе JWT токена.

@@ -48,16 +48,30 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         Returns:
             Habit: Созданная привычка.
         """
+        #  Конвертируем в словарь
+        habit_in_data = habit_in.model_dump()
+
         # Устанавливаем target_days из настроек, если в переданных данных - None
-        habit_in.target_days = habit_in.target_days if habit_in.target_days else settings.DAYS_TO_FORM_HABIT
+        if not habit_in_data.get("target_days"):
+            habit_in_data["target_days"] = settings.DAYS_TO_FORM_HABIT
+
+        # Создаем новый объект привычки
+        habit_obj = self.repository.model(**habit_in_data, user_id=current_user.id)
+
+        # Добавляем объект в сессию
+        db_session.add(habit_obj)
 
         try:
-            # Репозиторий добавляет объект привычки в сессию и делает flush (получает ID)
-            habit = await self.repository.create_habit(db_session, habit_in=habit_in, user_id=current_user.id)
-            # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
+            # Фиксируем транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
+
+            # Обновляем данные из базы данных
+            await db_session.refresh(habit_obj)
+
+            # Логируем успех
+            log.info(f"Привычка ID {habit_obj.id} для пользователя (ID: {current_user.id}) успешно создана.")
             # Возвращаем созданный объект привычки
-            return habit
+            return habit_obj
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
@@ -192,9 +206,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         log.info(f"Обновление привычки ID: {habit_id} для пользователя ID: {current_user.id}")
         return await super().update(db_session, obj_id=habit_to_update.id, obj_in=habit_in)
 
-    async def remove_habit_for_user(
-        self, db_session: AsyncSession, *, habit_id: int, current_user: User
-    ) -> None:
+    async def remove_habit_for_user(self, db_session: AsyncSession, *, habit_id: int, current_user: User) -> None:
         """
         Удаляет привычку, проверяя, что она принадлежит текущему пользователю.
 
