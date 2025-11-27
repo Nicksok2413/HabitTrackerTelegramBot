@@ -5,17 +5,14 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.exceptions import (
-    BadRequestException,
-    ForbiddenException,
-    NotFoundException,
-)
+from src.api.core.exceptions import BadRequestException, NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
-from src.api.repositories import HabitExecutionRepository, HabitRepository
+from src.api.repositories import HabitExecutionRepository
 from src.api.schemas import HabitExecutionSchemaCreate, HabitExecutionSchemaUpdate
 
 from .base_service import BaseService
+from .habit_service import HabitService
 
 
 class HabitExecutionService(
@@ -30,24 +27,23 @@ class HabitExecutionService(
     Сервис для управления выполнениями привычек (HabitExecution).
 
     Отвечает за создание, чтение, обновление записей о выполнении привычек,
-    а также за связанную бизнес-логику, такую как обновление счетчиков серий (стриков)
-    у родительской привычки.
+    а также за связанную бизнес-логику, такую как обновление счетчиков серий (стриков) у родительской привычки.
     """
 
     def __init__(
         self,
         execution_repository: HabitExecutionRepository,
-        habit_repository: HabitRepository,  # Добавляем зависимость от HabitRepository
+        habit_service: HabitService,  # Добавляем зависимость от HabitService
     ):
         """
         Инициализирует сервис выполнения привычек.
 
         Args:
             execution_repository (HabitExecutionRepository): Репозиторий для работы с выполнениями.
-            habit_repository (HabitRepository): Репозиторий для работы с привычками (для обновления стриков).
+            habit_service (HabitService): Сервис для работы с привычками.
         """
         super().__init__(repository=execution_repository)
-        self.habit_repository = habit_repository  # Сохраняем репозиторий привычек
+        self.habit_service = habit_service  # Сохраняем сервис привычек
 
     async def _get_habit_and_verify_access(
         self, db_session: AsyncSession, *, habit_id: int, current_user: User
@@ -71,26 +67,25 @@ class HabitExecutionService(
             ForbiddenException: Если привычка не принадлежит текущему пользователю.
             BadRequestException: Если привычка не активна.
         """
-        habit = await self.habit_repository.get_by_id(db_session, obj_id=habit_id)
 
-        if not habit:
-            raise NotFoundException(
-                message=f"Привычка с ID {habit_id} не найдена.",
-                error_type="habit_not_found",
-            )
+        # Проверяем существование привычки и её принадлежность текущему пользователю
+        # Используем метод сервиса привычек
+        habit = await self.habit_service.get_habit_by_id_for_user(
+            db_session,
+            habit_id=habit_id,
+            current_user=current_user
+        )
 
-        if habit.user_id != current_user.id:
-            raise ForbiddenException(
-                message="У вас нет прав для доступа к этой привычке.",
-                error_type="habit_access_forbidden",
-            )
-
+        # Если проверки прошли, значит привычка существует и принадлежит пользователю
+        # Проверяем активна ли привычка
         if not habit.is_active:
+            # Если привычка не активна, выбрасываем исключение
             raise BadRequestException(
                 message=f"Привычка '{habit.name}' не активна.",
                 error_type="habit_not_active",
             )
 
+        # Возвращаем найденный объект привычки
         return habit
 
     async def _update_habit_streaks(
@@ -378,16 +373,9 @@ class HabitExecutionService(
 
         # Получаем привычку для возможного обновления стриков
         # get_execution_details уже вызвал _get_habit_and_verify_access,
-        # который в свою очередь вызвал self.habit_repository.get_by_id
-        # и проверил, что привычка существует и принадлежит пользователю.
-        # Поэтому здесь мы можем быть уверены, что привычка найдется.
-        habit = await self.habit_repository.get_by_id(db_session, obj_id=execution_to_update.habit_id)
-
-        if not habit:
-            raise NotFoundException(
-                message=f"Привычка с ID {execution_to_update.habit_id} не найдена.",
-                error_type="habit_not_found",
-            )
+        # который проверил, что привычка существует и принадлежит пользователю.
+        # Поэтому здесь можем быть уверены, что привычка найдется.
+        habit = await self.habit_service.get_by_id(db_session, obj_id=execution_to_update.habit_id)
 
         streaks_were_updated = await self._update_habit_streaks(
             habit=habit,
