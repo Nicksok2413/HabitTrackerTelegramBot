@@ -112,8 +112,10 @@ class HabitExecutionService(
         Returns:
             bool: True, если стрики были изменены, иначе False.
         """
+        # Флаг изменения стриков
         streaks_changed = False
 
+        # Если выполнение не относится к сегодняшнему дню, логируем и возвращаем False
         if not is_new_execution_for_today:
             log.debug(f"Стрики для привычки ID: {habit.id} не обновляются, так как выполнение не за сегодня.")
             return False
@@ -123,19 +125,22 @@ class HabitExecutionService(
             f"предыдущий: {previous_execution_status.value if previous_execution_status else 'N/A'}"
         )
 
+        # Увеличиваем стрик если новое выполнение "DONE"
         if new_execution_status == HabitExecutionStatus.DONE:
-            # Увеличиваем стрик если новое выполнение "DONE"
-            # или если предыдущий статус не был "DONE" (PENDING или NOT_DONE)
+            # И если предыдущий статус не был "DONE" (PENDING или NOT_DONE)
             if previous_execution_status != HabitExecutionStatus.DONE:
                 habit.current_streak += 1
                 streaks_changed = True
+                log.debug(f"Текущий стрик увеличен до {habit.current_streak} для привычки ID: {habit.id}.")
+
+                # Если текущий стрик становится больше максимального, записываем его значение в максимальный
                 if habit.current_streak > habit.max_streak:
                     habit.max_streak = habit.current_streak
                     log.debug(f"Новый максимальный стрик {habit.max_streak} для привычки ID: {habit.id}.")
-                log.debug(f"Текущий стрик увеличен до {habit.current_streak} для привычки ID: {habit.id}.")
+
+        # Сбрасываем стрик, если привычка была отмечена как "NOT_DONE"
         elif new_execution_status == HabitExecutionStatus.NOT_DONE:
-            # Сбрасываем стрик, если привычка была отмечена как "NOT_DONE"
-            # и до этого она не была уже "NOT_DONE"
+            # И до этого она не была уже "NOT_DONE"
             if habit.current_streak > 0 and (previous_execution_status != HabitExecutionStatus.NOT_DONE):
                 habit.current_streak = 0
                 streaks_changed = True
