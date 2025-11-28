@@ -79,6 +79,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if filters:
             statement = statement.where(*filters)
 
+        # Явное ограничение остановки поиска после первого совпадения
+        statement = statement.limit(1)
+
         result = await db_session.execute(statement)
         return result.scalar_one_or_none()
 

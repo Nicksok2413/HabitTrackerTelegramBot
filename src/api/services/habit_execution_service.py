@@ -44,7 +44,12 @@ class HabitExecutionService(
         super().__init__(repository=execution_repository)
         self.habit_repository = habit_repository  # Сохраняем репозиторий привычек
 
-    async def _get_habit_by_id(self, db_session: AsyncSession, habit_id: int) -> Habit:
+    async def _get_habit_by_id(
+            self,
+            db_session: AsyncSession,
+            habit_id: int,
+            for_update: bool = False,
+    ) -> Habit:
         """
         Вспомогательный метод для получения привычки по ID.
 
@@ -53,6 +58,7 @@ class HabitExecutionService(
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
             habit_id (int): ID привычки.
+            for_update (bool): Флаг, указывающий, получаем ли мы привычку для ее же обновления.
 
         Returns:
             Habit: Экземпляр привычки.
@@ -61,7 +67,14 @@ class HabitExecutionService(
             NotFoundException: Если привычка не найдена.
         """
         # Проверка существования привычки
-        habit = await self.habit_repository.get_by_id(db_session, obj_id=habit_id)
+
+        if for_update:
+            # Если мы пытаемся получить привычку для ее последующего обновления используем специализированный метод,
+            # который блокирует строку от изменения другими транзакциями до конца текущей транзакции
+            habit = await self.habit_repository.get_habit_by_id_for_update(db_session, habit_id=habit_id)
+        else:
+            # Иначе используем стандартный метод, наследуемый от базового репозитория
+            habit = await self.habit_repository.get_by_id(db_session, obj_id=habit_id)
 
         # Если объект привычки не найден, выбрасываем исключение
         if not habit:
@@ -262,8 +275,9 @@ class HabitExecutionService(
             f"пользователем ID: {current_user.id} со статусом {execution_in.status.value}"
         )
 
-        # Проверяем существование привычки
-        habit = await self._get_habit_by_id(db_session, habit_id=habit_id)
+        # Получаем привычку с блокировкой (for_update=True)
+        # Это гарантирует, что другой поток не изменит её до конца транзакции
+        habit = await self._get_habit_by_id(db_session, habit_id=habit_id, for_update=True)
 
         # Проверяем ее принадлежность текущему пользователю
         self._check_habit_ownership(habit, current_user.id)

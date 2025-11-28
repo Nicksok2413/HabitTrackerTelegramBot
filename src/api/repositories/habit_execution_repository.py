@@ -42,10 +42,8 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
         result = await db_session.execute(statement)
         execution_with_habit = result.scalar_one_or_none()
 
-        if execution_with_habit:
-            log.debug(f"Найдено выполнение (ID: {execution_id}) для привычки ID: {execution_with_habit.habit.id}.")
-        else:
-            log.debug(f"Выполнение (ID: {execution_id}) для привычки не найдено.")
+        status = "найдено" if execution_with_habit else "не найдено"
+        log.debug(f"Выполнение (ID {execution_id}) с подгруженной привычкой {status}.")
 
         return execution_with_habit
 

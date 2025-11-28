@@ -134,8 +134,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
         # Если проверки прошли, значит привычка существует и принадлежит пользователю
         # Подгружаем привычку с выполнениями
-        log.info(f"Получение привычки ID: {habit_id} с выполнениями для пользователя ID: {current_user.id}")
-        habit = await self.repository.get_habit_with_executions(db_session, habit_id=habit_id)
+        habit = await self.repository.get_habit_by_id_with_executions(db_session, habit_id=habit_id)
 
         # Если привычка с выполнениями не найдена, выбрасываем исключение
         if not habit:

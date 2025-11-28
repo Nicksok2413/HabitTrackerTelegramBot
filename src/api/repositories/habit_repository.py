@@ -59,6 +59,54 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         # Возвращаем созданную привычку
         return habit_obj
 
+    async def get_habit_by_id_with_executions(self, db_session: AsyncSession, *, habit_id: int) -> Habit | None:
+        """
+        Получает привычку по ID с жадной загрузкой ее выполнений.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            habit_id (int): ID привычки.
+
+        Returns:
+            Habit | None: Экземпляр привычки с подгруженными выполнениями или None.
+        """
+        log.info(f"Получение привычки ID: {habit_id} с жадной загрузкой ее выполнений.")
+        statement = (
+            select(self.model)
+            .where(self.model.id == habit_id)
+            .options(selectinload(self.model.executions))  # Жадная загрузка выполнений
+        )
+        result = await db_session.execute(statement)
+        habit = result.scalar_one_or_none()
+
+        status = "найдена" if habit else "не найдена"
+        log.debug(f"Привычка (ID {habit_id}) с подгруженными выполнениями {status}.")
+
+        return habit
+
+    async def get_habit_by_id_for_update(self, db_session: AsyncSession, *, habit_id: int) -> Habit | None:
+        """
+        Получает привычку по ID для ее последующего обновления.
+
+        Получает привычку по ID и блокирует строку от изменения другими транзакциями
+        до конца текущей транзакции (SELECT ... FOR UPDATE).
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            habit_id (int): ID привычки.
+
+        Returns:
+            Habit | None: Экземпляр привычки или None.
+        """
+        statement = select(self.model).where(self.model.id == habit_id).with_for_update()
+        result = await db_session.execute(statement)
+        habit = result.scalar_one_or_none()
+
+        status = "найдена" if habit else "не найдена"
+        log.debug(f"Привычка (ID {habit_id}) для обновления {status}.")
+
+        return habit
+
     async def get_habits_by_user_id(
         self,
         db_session: AsyncSession,
@@ -110,29 +158,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         log.debug(f"Найдено {len(habits)} привычек для пользователя ID: {user_id}.")
         return habits
 
-    async def get_habit_with_executions(self, db_session: AsyncSession, *, habit_id: int) -> Habit | None:
-        """
-        Получает привычку по ID вместе с ее выполнениями.
 
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            habit_id (int): ID привычки.
-
-        Returns:
-            Habit | None: Экземпляр Habit с загруженными выполнениями или None.
-        """
-        statement = (
-            select(self.model)
-            .where(self.model.id == habit_id)
-            .options(selectinload(self.model.executions))  # Жадная загрузка выполнений
-        )
-        result = await db_session.execute(statement)
-        habit = result.scalar_one_or_none()
-
-        status = "найдена" if habit else "не найдена"
-        log.debug(f"Привычка (ID {habit_id}) с загруженными выполнениями {status}.")
-
-        return habit
 
 
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
