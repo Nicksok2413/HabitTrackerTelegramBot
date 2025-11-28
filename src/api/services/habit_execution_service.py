@@ -5,14 +5,13 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.exceptions import BadRequestException
+from src.api.core.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from src.api.core.logging import api_log as log
 from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
-from src.api.repositories import HabitExecutionRepository
+from src.api.repositories import HabitExecutionRepository, HabitRepository
 from src.api.schemas import HabitExecutionSchemaCreate, HabitExecutionSchemaUpdate
 
 from .base_service import BaseService
-from .habit_service import HabitService
 
 
 class HabitExecutionService(
@@ -33,94 +32,83 @@ class HabitExecutionService(
     def __init__(
         self,
         execution_repository: HabitExecutionRepository,
-        habit_service: HabitService,  # Добавляем зависимость от HabitService
+        habit_repository: HabitRepository,  # Добавляем зависимость от HabitRepository
     ):
         """
         Инициализирует сервис выполнения привычек.
 
         Args:
             execution_repository (HabitExecutionRepository): Репозиторий для работы с выполнениями.
-            habit_service (HabitService): Сервис для работы с привычками.
+            habit_repository (HabitRepository): Репозиторий для работы с привычками.
         """
         super().__init__(repository=execution_repository)
-        self.habit_service = habit_service  # Сохраняем сервис привычек
+        self.habit_repository = habit_repository  # Сохраняем репозиторий привычек
 
-    async def _get_habit_and_verify_access(
-        self, db_session: AsyncSession, *, habit_id: int, current_user: User
-    ) -> Habit:
+    async def _get_habit_by_id(self, db_session: AsyncSession, habit_id: int) -> Habit:
         """
-        Вспомогательный метод для получения привычки и проверки прав доступа пользователя.
+        Вспомогательный метод для получения привычки по ID.
 
-        Проверяет, существует ли привычка, принадлежит ли она текущему пользователю
-        и активна ли она.
+        Получает привычку по ID или выбрасывает исключение.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
-            habit_id (int): ID привычки для проверки.
-            current_user (User): Аутентифицированный пользователь.
+            habit_id (int): ID привычки.
 
         Returns:
-            Habit: Экземпляр модели Habit, если все проверки пройдены.
+            Habit: Экземпляр привычки.
 
         Raises:
-            NotFoundException: Если привычка с указанным ID не найдена.
-            ForbiddenException: Если привычка не принадлежит текущему пользователю.
-            BadRequestException: Если привычка не активна.
+            NotFoundException: Если привычка не найдена.
         """
+        # Проверка существования привычки
+        habit = await self.habit_repository.get_by_id(db_session, obj_id=habit_id)
 
-        # Проверяем существование привычки и её принадлежность текущему пользователю
-        # Используем метод сервиса привычек
-        habit = await self.habit_service.get_habit_by_id_for_user(
-            db_session, habit_id=habit_id, current_user=current_user
-        )
-
-        # Если проверки прошли, значит привычка существует и принадлежит пользователю
-        # Проверяем активна ли привычка
-        if not habit.is_active:
-            # Если привычка не активна, выбрасываем исключение
-            raise BadRequestException(
-                message=f"Привычка '{habit.name}' не активна.",
-                error_type="habit_not_active",
+        # Если объект привычки не найден, выбрасываем исключение
+        if not habit:
+            raise NotFoundException(
+                message=f"Привычка с ID {habit_id} не найдена.",
+                error_type="habit_not_found"
             )
 
         # Возвращаем найденный объект привычки
         return habit
 
-    async def get_execution_details(
-        self, db_session: AsyncSession, *, execution_id: int, current_user: User
-    ) -> HabitExecution:
+    def _check_habit_ownership(self, habit: Habit, user_id: int) -> None:
         """
-        Получает детали конкретной записи о выполнении привычки.
-
-        Проверяет, что запись о выполнении существует, что связанная с ней привычка активна
-        и принадлежит текущему аутентифицированному пользователю.
+        Вспомогательный метод для проверки принадлежности привычки пользователю.
 
         Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            execution_id (int): ID записи о выполнении.
-            current_user (User): Аутентифицированный пользователь.
-
-        Returns:
-            HabitExecution: Экземпляр записи о выполнении.
+            habit (Habit): Экземпляр привычки.
+            user_id (int): ID пользователя.
 
         Raises:
-            NotFoundException: Если запись о выполнении или связанная привычка не найдены.
-            ForbiddenException: Если у пользователя нет прав на доступ к связанной привычке.
+            ForbiddenException: Если привычка не принадлежит текущему пользователю.
+        """
+        # Если пользователи не совпадают, логируем и выбрасываем исключение
+        if habit.user_id != user_id:
+            log.warning(f"Попытка доступа к чужой привычке ID: {habit.id}. User: {user_id}, Owner: {habit.user_id}")
+            raise ForbiddenException(
+                message="У вас нет прав на доступ к этой привычке.",
+                error_type="habit_forbidden"
+            )
+
+    def _check_habit_active(self, habit: Habit) -> None:
+        """
+        Вспомогательный метод для проверки активна ли привычка.
+
+        Args:
+            habit (Habit): habit (Habit): Экземпляр привычки.
+
+        Raises:
             BadRequestException: Если привычка не активна.
         """
-        # Проверяем существование записи о выполнении
-        # get_by_id выбросит исключение если запись не будет найдена
-        execution = await self.get_by_id(db_session, obj_id=execution_id)
-
-        # Проверяем доступ через связанную привычку
-        # _get_habit_and_verify_access выбросит исключение, если что-то не так с привычкой
-        await self._get_habit_and_verify_access(db_session, habit_id=execution.habit_id, current_user=current_user)
-
-        # Логируем успех
-        log.debug(f"Детали выполнения ID: {execution_id} успешно получены.")
-
-        # Возвращаем объект выполнения привычки
-        return execution
+        # Если привычка не активна, логируем и выбрасываем исключение
+        if not habit.is_active:
+            log.warning(f"Привычка '{habit.name}' не активна (в архиве).")
+            raise BadRequestException(
+                message=f"Привычка '{habit.name}' не активна (в архиве).",
+                error_type="habit_not_active",
+            )
 
     async def _update_habit_streaks(
         self,
@@ -155,13 +143,14 @@ class HabitExecutionService(
         streaks_changed = False
 
         log.debug(
-            f"Обновление стриков для привычки ID: {habit.id}. Новый статус: {new_execution_status.value}, "
-            f"предыдущий: {previous_execution_status.value if previous_execution_status else 'N/A'}"
+            f"Обновление стриков для привычки ID: {habit.id}. "
+            f"Статус: {previous_execution_status.value if previous_execution_status else 'N/A'}->{new_execution_status}"
         )
 
-        # Отметка выполнено (new_execution_status = "DONE")
+        # Сценарий A: Привычка выполнена (new_execution_status = "DONE")
         if new_execution_status == HabitExecutionStatus.DONE:
-            # Увеличиваем стрик, если предыдущий статус ранее сегодня не был "DONE" ("PENDING" или "NOT_DONE")
+            # Увеличиваем стрик, только если привычка НЕ была выполнена ранее сегодня
+            # Предыдущий статус = "PENDING" или "NOT_DONE"
             if previous_execution_status != HabitExecutionStatus.DONE:
                 habit.current_streak += 1
                 streaks_changed = True
@@ -170,9 +159,9 @@ class HabitExecutionService(
                 # Если текущий стрик становится больше максимального, записываем его значение в максимальный
                 if habit.current_streak > habit.max_streak:
                     habit.max_streak = habit.current_streak
-                    log.debug(f"Новый максимальный стрик {habit.max_streak} для привычки ID: {habit.id}.")
+                    log.debug(f"Новый рекорд стрика для привычки ID {habit.id}: {habit.max_streak}!.")
 
-        # Отметка не выполнено (new_execution_status = "NOT_DONE")
+        # Сценарий B: Привычка не выполнена (new_execution_status = "NOT_DONE")
         elif new_execution_status == HabitExecutionStatus.NOT_DONE:
             # Сбрасываем стрик, если он был больше 0
             if habit.current_streak > 0:
@@ -180,14 +169,61 @@ class HabitExecutionService(
                 streaks_changed = True
                 log.debug(f"Текущий стрик сброшен для привычки ID: {habit.id}.")
 
-        # Случайная отмена выполнения (new_execution_status = "PENDING")
+        # Сценарий C: Отмена выполнения (new_execution_status = "PENDING")
         elif new_execution_status == HabitExecutionStatus.PENDING:
-            # Если статус меняется с DONE на PENDING (случайное нажатие), уменьшаем стрик на 1, но не ниже 0
+            # Если статус меняется с DONE на PENDING (пользователь случайно нажал "Выполнил", а потом отменил),
+            # уменьшаем стрик на 1, но не ниже 0
             if previous_execution_status == HabitExecutionStatus.DONE and habit.current_streak > 0:
                 habit.current_streak -= 1
                 streaks_changed = True
+                log.debug(f"Стрик для привычки ID {habit.id} уменьшен (отмена выполнения).")
 
+        # Возвращаем флаг изменения стриков
         return streaks_changed
+
+    async def get_execution_with_habit(
+            self, db_session: AsyncSession, *, execution_id: int, current_user: User
+    ) -> HabitExecution:
+        """
+        Получает детали конкретной записи о выполнении привычки с подгруженным объектом самой привычки.
+
+        Проверяет, что запись о выполнении существует, что связанная с ней привычка активна
+        и принадлежит текущему аутентифицированному пользователю.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            execution_id (int): ID записи о выполнении.
+            current_user (User): Аутентифицированный пользователь.
+
+        Returns:
+            HabitExecution: Экземпляр записи о выполнении с подгруженной привычкой.
+
+        Raises:
+            NotFoundException: Если запись о выполнении или связанная привычка не найдены.
+            ForbiddenException: Если у пользователя нет прав на доступ к связанной привычке.
+            BadRequestException: Если привычка не активна.
+        """
+
+        # Получаем выполнения с подгруженной привычкой
+        execution_with_habit = await self.repository.get_execution_by_id_with_habit(db_session,
+                                                                                    execution_id=execution_id)
+
+        # Если записи о выполнении не существует, логируем и выбрасываем исключение
+        if not execution_with_habit:
+            log.warning(f"Выполнение ID {execution_id} не найдено.")
+            raise NotFoundException(message=f"Выполнение ID {execution_id} не найдено.")
+
+        # Объясняем переменную для объекта связанной привычки
+        habit = execution_with_habit.habit
+
+        # Проверяем права пользователя на привычку
+        self._check_habit_ownership(habit, current_user.id)
+
+        # Если ошибок не было, логируем успех
+        log.debug(f"Детали выполнения ID: {execution_id} успешно получены.")
+
+        # Возвращаем объект выполнения с подгруженной привычкой
+        return execution_with_habit
 
     async def record_habit_execution(
         self,
@@ -231,8 +267,13 @@ class HabitExecutionService(
             f"пользователем ID: {current_user.id} со статусом {execution_in.status.value}"
         )
 
-        # Проверяем существование привычки, её принадлежность текущему пользователю и что она активна
-        habit = await self._get_habit_and_verify_access(db_session, habit_id=habit_id, current_user=current_user)
+        # Проверяем существование привычки
+        habit = await self._get_habit_by_id(db_session, habit_id=habit_id)
+
+        # Проверяем ее принадлежность текущему пользователю
+        self._check_habit_ownership(habit, current_user.id)
+        # Проверяем что она активна
+        self._check_habit_active(habit)
 
         # Проверяем существование записи о выполнении на вычисленную дату
         existing_execution = await self.repository.get_execution_by_habit_id_and_date(
@@ -294,6 +335,7 @@ class HabitExecutionService(
                 f"Выполнение привычки ID {habit_id} на {target_date} (ID: {db_execution.id}) "
                 f"успешно записано со статусом {execution_in.status.value}."
             )
+
             # Возвращаем созданный/обновленный объект выполнения привычки
             return db_execution
 
@@ -341,8 +383,13 @@ class HabitExecutionService(
             ForbiddenException: Если у пользователя нет прав на доступ к этой привычке.
             BadRequestException: Если привычка не активна.
         """
-        # Проверяем существование привычки, её принадлежность текущему пользователю и что она активна
-        await self._get_habit_and_verify_access(db_session, habit_id=habit_id, current_user=current_user)
+        # Проверяем существование привычки
+        habit = await self._get_habit_by_id(db_session, habit_id=habit_id)
+
+        # Проверяем ее принадлежность текущему пользователю
+        self._check_habit_ownership(habit, current_user.id)
+        # Проверяем что она активна
+        self._check_habit_active(habit)
 
         # Получает список выполнений для привычки
         return await self.repository.get_executions_for_habit(
@@ -354,80 +401,3 @@ class HabitExecutionService(
             skip=skip,
             limit=limit,
         )
-
-    # async def update_execution_status(
-    #     self,
-    #     db_session: AsyncSession,
-    #     *,
-    #     execution_id: int,
-    #     status_in: HabitExecutionSchemaUpdate,
-    #     current_user: User,
-    # ) -> HabitExecution:
-    #     """
-    #     Обновляет статус существующей записи о выполнении привычки.
-    #
-    #     Проверяет права доступа пользователя к связанной привычке.
-    #     Логика обновления стриков при изменении статуса выполнения за прошлые дни
-    #     для MVP упрощена (стрики обновляются при фиксации сегодняшнего дня).
-    #
-    #     Args:
-    #         db_session (AsyncSession): Асинхронная сессия базы данных.
-    #         execution_id (int): ID записи о выполнении для обновления.
-    #         status_in (HabitExecutionSchemaUpdate): Схема с новым статусом.
-    #         current_user (User): Аутентифицированный пользователь.
-    #
-    #     Returns:
-    #         HabitExecution: Обновленная запись о выполнении.
-    #
-    #     Raises:
-    #         NotFoundException: Если запись о выполнении или связанная привычка не найдены.
-    #         ForbiddenException: Если у пользователя нет прав на доступ к связанной привычке.
-    #         BadRequestException: Если привычка не активна.
-    #     """
-    #     log.info(
-    #         f"Обновление статуса выполнения ID: {execution_id} на {status_in.status.value} "
-    #         f"пользователем ID: {current_user.id}"
-    #     )
-    #
-    #     execution_to_update = await self.get_execution_details(
-    #         db_session,
-    #         execution_id=execution_id,
-    #         current_user=current_user,
-    #     )
-    #
-    #     if execution_to_update.status == status_in.status:
-    #         log.debug(f"Статус выполнения ID: {execution_id} уже {status_in.status.value}, обновление не требуется.")
-    #         return execution_to_update  # Статус не изменился, просто возвращаем
-    #
-    #     previous_status = execution_to_update.status
-    #     execution_to_update.status = status_in.status
-    #
-    #     # Получаем привычку для возможного обновления стриков
-    #     # get_execution_details уже вызвал _get_habit_and_verify_access,
-    #     # который проверил, что привычка существует и принадлежит пользователю.
-    #     # Поэтому здесь можем быть уверены, что привычка найдется.
-    #     habit = await self.habit_service.get_by_id(db_session, obj_id=execution_to_update.habit_id)
-    #
-    #     streaks_were_updated = await self._update_habit_streaks(
-    #         habit=habit,
-    #         new_execution_status=status_in.status,
-    #         is_new_execution_for_today=(execution_to_update.execution_date == date.today()),
-    #         previous_execution_status=previous_status,
-    #     )
-    #
-    #     try:
-    #         await db_session.flush()
-    #         await db_session.refresh(execution_to_update)
-    #         if streaks_were_updated:
-    #             await db_session.refresh(habit)
-    #         await db_session.commit()
-    #         log.info(f"Статус выполнения ID: {execution_id} успешно обновлен на {status_in.status.value}.")
-    #     except Exception as exc:
-    #         log.error(
-    #             f"Ошибка при обновлении статуса выполнения ID: {execution_id}: {exc}",
-    #             exc_info=True,
-    #         )
-    #         await db_session.rollback()
-    #         raise
-    #
-    #     return execution_to_update
