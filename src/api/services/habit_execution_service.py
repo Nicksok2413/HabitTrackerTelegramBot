@@ -5,7 +5,7 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.exceptions import BadRequestException, NotFoundException, ForbiddenException
+from src.api.core.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
 from src.api.repositories import HabitExecutionRepository, HabitRepository
@@ -65,10 +65,7 @@ class HabitExecutionService(
 
         # Если объект привычки не найден, выбрасываем исключение
         if not habit:
-            raise NotFoundException(
-                message=f"Привычка с ID {habit_id} не найдена.",
-                error_type="habit_not_found"
-            )
+            raise NotFoundException(message=f"Привычка с ID {habit_id} не найдена.", error_type="habit_not_found")
 
         # Возвращаем найденный объект привычки
         return habit
@@ -87,10 +84,7 @@ class HabitExecutionService(
         # Если пользователи не совпадают, логируем и выбрасываем исключение
         if habit.user_id != user_id:
             log.warning(f"Попытка доступа к чужой привычке ID: {habit.id}. User: {user_id}, Owner: {habit.user_id}")
-            raise ForbiddenException(
-                message="У вас нет прав на доступ к этой привычке.",
-                error_type="habit_forbidden"
-            )
+            raise ForbiddenException(message="У вас нет прав на доступ к этой привычке.", error_type="habit_forbidden")
 
     def _check_habit_active(self, habit: Habit) -> None:
         """
@@ -182,7 +176,7 @@ class HabitExecutionService(
         return streaks_changed
 
     async def get_execution_with_habit(
-            self, db_session: AsyncSession, *, execution_id: int, current_user: User
+        self, db_session: AsyncSession, *, execution_id: int, current_user: User
     ) -> HabitExecution:
         """
         Получает детали конкретной записи о выполнении привычки с подгруженным объектом самой привычки.
@@ -205,8 +199,9 @@ class HabitExecutionService(
         """
 
         # Получаем выполнения с подгруженной привычкой
-        execution_with_habit = await self.repository.get_execution_by_id_with_habit(db_session,
-                                                                                    execution_id=execution_id)
+        execution_with_habit = await self.repository.get_execution_by_id_with_habit(
+            db_session, execution_id=execution_id
+        )
 
         # Если записи о выполнении не существует, логируем и выбрасываем исключение
         if not execution_with_habit:

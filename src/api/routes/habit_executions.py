@@ -201,8 +201,9 @@ async def read_habit_execution_details(
         f"Пользователь ID: {current_user.id} запрашивает детали выполнения ID: {execution_id} для привычки ID: {habit_id}"
     )
     # Сервис get_execution_details должен проверить, что execution принадлежит habit_id и current_user
-    execution = await execution_service.get_execution_with_habit(db_session, execution_id=execution_id,
-                                                                 current_user=current_user)
+    execution = await execution_service.get_execution_with_habit(
+        db_session, execution_id=execution_id, current_user=current_user
+    )
     # Дополнительная проверка, что выполнение относится к указанной в пути привычке
     if execution.habit_id != habit_id:
         log.warning(f"Выполнение ID {execution_id} не принадлежит привычке ID {habit_id}.")

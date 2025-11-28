@@ -21,7 +21,7 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
     """
 
     async def get_execution_by_id_with_habit(
-            self, db_session: AsyncSession, *, execution_id: int
+        self, db_session: AsyncSession, *, execution_id: int
     ) -> HabitExecution | None:
         """
         Получает запись о выполнение привычки по ID с жадной загрузкой связанной привычки.
@@ -37,7 +37,7 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
         statement = (
             select(self.model)
             .where(self.model.id == execution_id)
-            .options(selectinload(self.model.habit))   # Подгружаем объект привычки в атрибут .habit
+            .options(selectinload(self.model.habit))  # Подгружаем объект привычки в атрибут .habit
         )
         result = await db_session.execute(statement)
         execution_with_habit = result.scalar_one_or_none()
