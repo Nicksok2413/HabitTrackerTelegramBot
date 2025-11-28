@@ -159,8 +159,6 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         return habits
 
 
-
-
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
 # для использования планировщиком, если планировщик будет обращаться к API,
 # либо если логика планировщика будет в API сервисе.

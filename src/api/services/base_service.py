@@ -231,11 +231,11 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
             raise exc
 
     async def delete(
-            self,
-            db_session: AsyncSession,
-            *,
-            db_obj: ModelType | None = None,
-            obj_id: int,
+        self,
+        db_session: AsyncSession,
+        *,
+        db_obj: ModelType | None = None,
+        obj_id: int,
     ) -> None:
         """
         Удаляет объект базы данных.

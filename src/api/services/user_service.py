@@ -93,7 +93,7 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
 
             if not user:
                 # Это теоретически невозможно, если БД работает исправно, но для mypy оставляем
-                raise Exception("Критическая ошибка: Пользователь существует (IntegrityError), но не найден.")
+                raise Exception("Критическая ошибка: Пользователь существует (IntegrityError), но не найден.") from None
 
             # Возвращаем найденного пользователя
             return user
@@ -130,7 +130,9 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
             )
 
         # Обновляем пользователя
-        return await super().update(db_session, db_obj=user_to_update, obj_id=user_to_update.id, obj_in=user_update_data)
+        return await super().update(
+            db_session, db_obj=user_to_update, obj_id=user_to_update.id, obj_in=user_update_data
+        )
 
     # Другие специфичные для пользователя методы, если нужны...
     # Например, деактивация пользователя, проверка блокировки бота и т.д.

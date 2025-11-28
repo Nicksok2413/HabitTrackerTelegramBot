@@ -114,8 +114,7 @@ class HabitExecutionService(
         except Exception as exc:
             # Защита от любых других непредвиденных ошибок
             log.error(
-                f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}",
-                exc_info=True
+                f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}", exc_info=True
             )
             user_timezone = ZoneInfo("UTC")
 
@@ -128,10 +127,10 @@ class HabitExecutionService(
         return user_now.date()
 
     async def _get_habit_by_id(
-            self,
-            db_session: AsyncSession,
-            habit_id: int,
-            for_update: bool = False,
+        self,
+        db_session: AsyncSession,
+        habit_id: int,
+        for_update: bool = False,
     ) -> Habit:
         """
         Вспомогательный метод для получения привычки по ID.
@@ -372,7 +371,7 @@ class HabitExecutionService(
             db_session.add(db_execution)  # Добавляем новый объект в сессию
 
         # Если вычисленная дата = сегодня, обновляем стрики
-        is_today = (target_date == today_user_date)
+        is_today = target_date == today_user_date
 
         streaks_were_updated = await self._update_habit_streaks(
             habit=habit,
