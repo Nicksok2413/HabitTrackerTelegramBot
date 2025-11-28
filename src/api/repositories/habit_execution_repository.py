@@ -5,6 +5,7 @@ from typing import Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.api.core.logging import api_log as log
 from src.api.models import HabitExecution, HabitExecutionStatus
@@ -18,6 +19,35 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
 
     Наследует общие методы от BaseRepository и содержит специфичные для HabitExecution методы.
     """
+
+    async def get_execution_by_id_with_habit(
+            self, db_session: AsyncSession, *, execution_id: int
+    ) -> HabitExecution | None:
+        """
+        Получает запись о выполнение привычки по ID с жадной загрузкой связанной привычки.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            execution_id (int): ID выполнения привычки.
+
+        Returns:
+            HabitExecution | None: Экземпляр выполнения с подгруженной привычкой или None.
+        """
+        log.debug(f"Получение выполнения (ID: {execution_id}) привычки с жадной загрузкой самой привычки.")
+        statement = (
+            select(self.model)
+            .where(self.model.id == execution_id)
+            .options(selectinload(self.model.habit))   # Подгружаем объект привычки в атрибут .habit
+        )
+        result = await db_session.execute(statement)
+        execution_with_habit = result.scalar_one_or_none()
+
+        if execution_with_habit:
+            log.debug(f"Найдено выполнение (ID: {execution_id}) для привычки ID: {execution_with_habit.habit.id}.")
+        else:
+            log.debug(f"Выполнение (ID: {execution_id}) для привычки не найдено.")
+
+        return execution_with_habit
 
     async def get_execution_by_habit_id_and_date(
         self, db_session: AsyncSession, *, habit_id: int, execution_date: date
