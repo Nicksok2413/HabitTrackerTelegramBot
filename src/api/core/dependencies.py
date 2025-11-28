@@ -24,6 +24,11 @@ DBSession = Annotated[AsyncSession, Depends(get_db_session)]
 # --- Фабрики Репозиториев ---
 
 
+def get_user_repository() -> UserRepository:
+    """Создает экземпляр репозитория пользователей."""
+    return UserRepository(User)
+
+
 def get_habit_repository() -> HabitRepository:
     """Создает экземпляр репозитория привычек."""
     return HabitRepository(Habit)
@@ -34,23 +39,13 @@ def get_habit_execution_repository() -> HabitExecutionRepository:
     return HabitExecutionRepository(HabitExecution)
 
 
-def get_user_repository() -> UserRepository:
-    """Создает экземпляр репозитория пользователей."""
-    return UserRepository(User)
-
-
 # Типизация репозиториев (для использования в аргументах функций)
+UserRepo = Annotated[UserRepository, Depends(get_user_repository)]
 HabitRepo = Annotated[HabitRepository, Depends(get_habit_repository)]
 HabitExecutionRepo = Annotated[HabitExecutionRepository, Depends(get_habit_execution_repository)]
-UserRepo = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 # --- Фабрики Сервисов ---
-
-
-def get_habit_service(repository: HabitRepo) -> HabitService:
-    """Создает экземпляр сервиса привычек."""
-    return HabitService(habit_repository=repository)
 
 
 def get_user_service(repository: UserRepo) -> UserService:
@@ -58,22 +53,20 @@ def get_user_service(repository: UserRepo) -> UserService:
     return UserService(user_repository=repository)
 
 
-# Сначала определяем алиасы для UserSvc и HabitSvc, так как HabitSvc нужен для HabitExecutionSvc
-HabitSvc = Annotated[HabitService, Depends(get_habit_service)]
+def get_habit_service(repository: HabitRepo) -> HabitService:
+    """Создает экземпляр сервиса привычек."""
+    return HabitService(habit_repository=repository)
+
+
+# HabitExecutionService зависит от HabitExecutionRepo и HabitRepo
+def get_habit_execution_service(repository: HabitExecutionRepo, habit_repository: HabitRepo) -> HabitExecutionService:
+    """Создает экземпляр сервиса выполнений."""
+    return HabitExecutionService(execution_repository=repository, habit_repository=habit_repository)
+
+
+# Типизация для сервисов (для использования в аргументах функций)
 UserSvc = Annotated[UserService, Depends(get_user_service)]
-
-
-# HabitExecutionService зависит от HabitExecutionRepo и HabitService
-def get_habit_execution_service(repository: HabitExecutionRepo, habit_service: HabitSvc) -> HabitExecutionService:
-    """
-    Создает экземпляр сервиса выполнений.
-
-    Внедряет HabitService для проверки прав доступа к привычке.
-    """
-    return HabitExecutionService(execution_repository=repository, habit_service=habit_service)
-
-
-# Алиас для сервиса выполнений
+HabitSvc = Annotated[HabitService, Depends(get_habit_service)]
 HabitExecutionSvc = Annotated[HabitExecutionService, Depends(get_habit_execution_service)]
 
 # --- Зависимость для получения текущего пользователя ---
