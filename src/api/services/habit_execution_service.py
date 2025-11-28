@@ -1,7 +1,8 @@
 """Сервис для работы с выполнениями привычек."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Sequence
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +45,88 @@ class HabitExecutionService(
         super().__init__(repository=execution_repository)
         self.habit_repository = habit_repository  # Сохраняем репозиторий привычек
 
+    def _check_habit_ownership(self, habit: Habit, user_id: int) -> None:
+        """
+        Вспомогательный метод для проверки принадлежности привычки пользователю.
+
+        Args:
+            habit (Habit): Экземпляр привычки.
+            user_id (int): ID пользователя.
+
+        Raises:
+            ForbiddenException: Если привычка не принадлежит текущему пользователю.
+        """
+        # Если пользователи не совпадают, логируем и выбрасываем исключение
+        if habit.user_id != user_id:
+            log.warning(f"Попытка доступа к чужой привычке ID: {habit.id}. User: {user_id}, Owner: {habit.user_id}")
+            raise ForbiddenException(message="У вас нет прав на доступ к этой привычке.", error_type="habit_forbidden")
+
+    def _check_habit_active(self, habit: Habit) -> None:
+        """
+        Вспомогательный метод для проверки активна ли привычка.
+
+        Args:
+            habit (Habit): Экземпляр привычки.
+
+        Raises:
+            BadRequestException: Если привычка не активна.
+        """
+        # Если привычка не активна, логируем и выбрасываем исключение
+        if not habit.is_active:
+            log.warning(f"Привычка '{habit.name}' не активна (в архиве).")
+            raise BadRequestException(
+                message=f"Привычка '{habit.name}' не активна (в архиве).",
+                error_type="habit_not_active",
+            )
+
+    def _get_today_date_for_user(self, user: User) -> date:
+        """
+        Вычисляет текущую дату ("сегодня") с учетом часового пояса пользователя.
+
+        Если часовой пояс пользователя некорректен, используется UTC.
+
+        Args:
+            user (User): habit (Habit): Экземпляр пользователя.
+
+        Returns:
+            date: Объект даты (YYYY-MM-DD), соответствующий "сегодня" для пользователя.
+        """
+        # Получаем текущее абсолютное время в UTC
+        utc_now = datetime.now(timezone.utc)
+
+        # Получаем строку часового пояса пользователя
+        # Если поле пустое или None, используем UTC как дефолт
+        user_timezone_str = user.timezone or "UTC"
+
+        try:
+            # Пытаемся создать объект информации о часовом поясе (IANA time zone)
+            user_timezone = ZoneInfo(user_timezone_str)
+
+        except ZoneInfoNotFoundError:
+            # Если в записана несуществующая таймзона (например, опечатка),
+            # не роняем запрос, а логируем проблему и откатываемся к UTC
+            log.warning(
+                f"Некорректный часовой пояс '{user_timezone_str}' у пользователя ID {user.id}. "
+                "Используется UTC по умолчанию."
+            )
+            user_timezone = ZoneInfo("UTC")
+
+        except Exception as exc:
+            # Защита от любых других непредвиденных ошибок
+            log.error(
+                f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}",
+                exc_info=True
+            )
+            user_timezone = ZoneInfo("UTC")
+
+        # Конвертируем UTC время во время пользователя
+        # Метод astimezone() создает новый объект datetime с тем же абсолютным моментом времени,
+        # но с атрибутами year, month, day, hour, скорректированными под смещение таймзоны
+        user_now = utc_now.astimezone(user_timezone)
+
+        # Извлекаем и возвращаем дату "сегодня" для пользователя
+        return user_now.date()
+
     async def _get_habit_by_id(
             self,
             db_session: AsyncSession,
@@ -82,40 +165,6 @@ class HabitExecutionService(
 
         # Возвращаем найденный объект привычки
         return habit
-
-    def _check_habit_ownership(self, habit: Habit, user_id: int) -> None:
-        """
-        Вспомогательный метод для проверки принадлежности привычки пользователю.
-
-        Args:
-            habit (Habit): Экземпляр привычки.
-            user_id (int): ID пользователя.
-
-        Raises:
-            ForbiddenException: Если привычка не принадлежит текущему пользователю.
-        """
-        # Если пользователи не совпадают, логируем и выбрасываем исключение
-        if habit.user_id != user_id:
-            log.warning(f"Попытка доступа к чужой привычке ID: {habit.id}. User: {user_id}, Owner: {habit.user_id}")
-            raise ForbiddenException(message="У вас нет прав на доступ к этой привычке.", error_type="habit_forbidden")
-
-    def _check_habit_active(self, habit: Habit) -> None:
-        """
-        Вспомогательный метод для проверки активна ли привычка.
-
-        Args:
-            habit (Habit): habit (Habit): Экземпляр привычки.
-
-        Raises:
-            BadRequestException: Если привычка не активна.
-        """
-        # Если привычка не активна, логируем и выбрасываем исключение
-        if not habit.is_active:
-            log.warning(f"Привычка '{habit.name}' не активна (в архиве).")
-            raise BadRequestException(
-                message=f"Привычка '{habit.name}' не активна (в архиве).",
-                error_type="habit_not_active",
-            )
 
     async def _update_habit_streaks(
         self,
@@ -267,8 +316,13 @@ class HabitExecutionService(
             ForbiddenException: Если у пользователя нет прав на доступ к этой привычке.
             BadRequestException: Если привычка не активна.
         """
+        # Определяем дату "сегодня" для пользователя
+        today_user_date = self._get_today_date_for_user(current_user)
+
         # Вычисляем дату фиксирования выполнения
-        target_date = execution_date_override if execution_date_override else date.today()
+        # Если дата передана вручную (execution_date_override), используем её,
+        # иначе используем "сегодня" по времени пользователя
+        target_date = execution_date_override if execution_date_override else today_user_date
 
         log.info(
             f"Запись выполнения для привычки ID: {habit_id} на {target_date} "
@@ -318,10 +372,12 @@ class HabitExecutionService(
             db_session.add(db_execution)  # Добавляем новый объект в сессию
 
         # Если вычисленная дата = сегодня, обновляем стрики
+        is_today = (target_date == today_user_date)
+
         streaks_were_updated = await self._update_habit_streaks(
             habit=habit,
             new_execution_status=execution_in.status,
-            is_new_execution_for_today=(target_date == date.today()),
+            is_new_execution_for_today=is_today,
             previous_execution_status=previous_status,
         )
 

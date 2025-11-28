@@ -179,12 +179,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         # Добавляем объект в сессию
         db_session.add(db_obj)
+
         # Получаем ID и другие сгенерированные базой данных значения
         await db_session.flush()
+
         # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
+
         # Логируем успешное создание объекта
         log.info(f"{model_name} успешно создан.")
+
         # Возвращаем созданный объект
         return db_obj
 
@@ -223,12 +227,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         # Добавляем объект в сессию
         db_session.add(db_obj)
+
         # Получаем ID и другие сгенерированные базой данных значения
         await db_session.flush()
+
         # Обновляем объект из базы данных
         await db_session.refresh(db_obj)
+
         # Логируем успешное обновление объекта
         log.info(f"{model_name} с ID: {db_obj.id} успешно обновлен.")
+
         # Возвращаем обновленный объект
         return db_obj
 

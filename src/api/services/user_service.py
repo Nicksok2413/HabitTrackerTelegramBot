@@ -130,7 +130,7 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
             )
 
         # Обновляем пользователя
-        return await super().update(db_session, obj_id=user_to_update.id, obj_in=user_update_data)
+        return await super().update(db_session, db_obj=user_to_update, obj_id=user_to_update.id, obj_in=user_update_data)
 
     # Другие специфичные для пользователя методы, если нужны...
     # Например, деактивация пользователя, проверка блокировки бота и т.д.

@@ -80,7 +80,7 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
                 loc=["query", "sort_by"],
             )
 
-        field = getattr(self.repository.model, sort_by)
+        field = getattr(self.repository.model.__table__.columns, sort_by)
 
         # Формируем выражение сортировки
         order_expression = desc(field) if descending else asc(field)
@@ -159,15 +159,19 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         model_name = self.repository.model.__name__
 
         try:
-            # Репозиторий добавляет объект в сессию и делает flush (получает ID)
+            # Репозиторий добавляет объект в сессию
             db_obj = await self.repository.create(db_session, obj_in=obj_in)
+
             # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
+
             # Возвращаем созданный объект
             return cast(ModelType, db_obj)  # Явное приведение типа для mypy
+
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
+
             # Логируем ошибку и выбрасываем исключение
             log.error(f"Ошибка при создании {model_name}: {exc}", exc_info=True)
             raise exc
@@ -176,19 +180,22 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         self,
         db_session: AsyncSession,
         *,
+        db_obj: ModelType | None = None,
         obj_id: int,
         obj_in: UpdateSchemaType,
-        **kwargs: Any,
     ) -> ModelType:
         """
-        Обновляет существующий объект по ID или выбрасывает исключение, если объект не найден.
+        Обновляет объект базы данных.
+
+        Ищет объект по ID и обновляет его или выбрасывает исключение, если объект не найден.
+        Если передан аргумент `db_obj` - уже найденный объект для обновления,
+        то не выполняет поиск (избегаем лишнего SELECT).
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
+            db_obj (ModelType | None): Сам объект для обновления.
             obj_id (int): ID объекта для обновления.
             obj_in (UpdateSchemaType): Схема с данными для обновления.
-            **kwargs: Дополнительные аргументы, которые могут быть использованы для
-                      проверки прав или других условий перед обновлением.
 
         Returns:
             ModelType: Обновленный объект.
@@ -198,55 +205,73 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         """
         model_name = self.repository.model.__name__
 
-        # Проверка существования и получение объекта
-        db_obj = await self.get_by_id(db_session, obj_id=obj_id)
+        # Если сам объект для обновления (db_obj) не был передан, то выполняем его поиск по ID
+        if db_obj is None:
+            db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
         # Здесь можно добавить дополнительные проверки прав доступа, используя **kwargs,
         # например, проверка, что user_id из JWT совпадает с user_id объекта
 
         try:
-            # Репозиторий добавляет объект в сессию и делает flush (получает ID)
+            # Репозиторий добавляет объект в сессию
             updated_obj = await self.repository.update(db_session, db_obj=db_obj, obj_in=obj_in)
-            # Сервис фиксирует транзакцию (бизнес-операция завершена успешно)
+
+            # Сервис фиксирует обновление объекта
             await db_session.commit()
+
             # Возвращаем обновленный объект
             return cast(ModelType, updated_obj)  # Явное приведение типа для mypy
+
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
+
             # Логируем ошибку и выбрасываем исключение
             log.error(f"Ошибка при обновлении {model_name} (ID: {obj_id}): {exc}", exc_info=True)
             raise exc
 
-    async def delete(self, db_session: AsyncSession, *, obj_id: int, **kwargs: Any) -> None:
+    async def delete(
+            self,
+            db_session: AsyncSession,
+            *,
+            db_obj: ModelType | None = None,
+            obj_id: int,
+    ) -> None:
         """
-        Находит объект по ID и удаляет его или выбрасывает исключение, если объект не найден.
+        Удаляет объект базы данных.
+
+        Ищет объект по ID и удаляет его или выбрасывает исключение, если объект не найден.
+        Если передан аргумент `db_obj` - уже найденный объект для удаления,
+        то не выполняет поиск (избегаем лишнего SELECT).
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
+            db_obj (ModelType | None): Сам объект для удаления.
             obj_id (int): ID объекта для удаления.
-            **kwargs: Дополнительные аргументы для проверок.
 
         Raises:
             NotFoundException: Если объект для удаления не найден.
         """
         model_name = self.repository.model.__name__
 
-        # Проверка существования и получение объекта
-        db_obj = await self.get_by_id(db_session, obj_id=obj_id)
-
-        # Здесь можно добавить дополнительные проверки прав доступа
+        # Если сам объект для удаления (db_obj) не был передан, то выполняем его поиск по ID
+        if db_obj is None:
+            db_obj = await self.get_by_id(db_session, obj_id=obj_id)
 
         try:
             # Репозиторий помечает объект на удаление
             await self.repository.remove(db_session, db_obj=db_obj)
+
             # Сервис фиксирует удаление объекта
             await db_session.commit()
+
             # Логируем успешное удаление объекта
             log.info(f"{model_name} (ID: {obj_id}) успешно удален.")
+
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
+
             # Логируем ошибку и выбрасываем исключение
             log.error(f"Ошибка при удалении {model_name} (ID: {obj_id}): {exc}", exc_info=True)
             raise exc
