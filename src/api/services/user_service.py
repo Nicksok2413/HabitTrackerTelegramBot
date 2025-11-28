@@ -1,8 +1,10 @@
 """Сервис для работы с пользователями."""
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.core.exceptions import NotFoundException
+from src.api.core.logging import api_log as log
 from src.api.models import User
 from src.api.repositories import UserRepository
 from src.api.schemas import UserSchemaCreate, UserSchemaUpdate
@@ -70,8 +72,27 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
         if existing_user:
             return existing_user
 
-        # Если пользователя нет, создаем нового пользователя
-        return await super().create(db_session, obj_in=user_in)
+        # Если пользователя нет, пытаемся создать и вернуть нового пользователя
+        try:
+            return await super().create(db_session, obj_in=user_in)  # Родительский метод .create() делает коммит
+
+        # Обрабатываем Race Conditions
+        # Если попадаем сюда, значит пользователь с таким telegram_id был создан другим потоком
+        except IntegrityError:
+            # Откатываем транзакцию
+            await db_session.rollback()
+
+            # Логируем состояние гонки
+            log.warning(
+                f"Race condition при создании пользователя {user_in.telegram_id}."
+                "Получаем пользователя, созданного другим потоком."
+            )
+
+            # Теперь гарантированно находим пользователя
+            user = await self.repository.get_by_telegram_id(db_session, telegram_id=user_in.telegram_id)
+
+            # Возвращаем найденного пользователя
+            return user
 
     async def update_user_by_telegram_id(
         self,
