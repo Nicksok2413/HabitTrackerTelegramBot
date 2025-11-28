@@ -220,8 +220,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         # Обновляем поля модели
         for field, value in update_data.items():
-            if hasattr(db_obj, field):
-                setattr(db_obj, field, value)
+            if hasattr(db_obj.__class__, field):
+                setattr(db_obj.__class__, field, value)
             else:
                 log.warning(f"Попытка обновить несуществующее поле '{field}' для {model_name} ID: {db_obj.id}")
 
