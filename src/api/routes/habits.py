@@ -7,7 +7,6 @@ from typing import Annotated, Sequence
 from fastapi import APIRouter, Query, status
 
 from src.api.core.dependencies import CurrentUser, DBSession, HabitSvc
-from src.api.core.logging import api_log as log
 from src.api.models import Habit
 from src.api.schemas import (
     HabitSchemaCreate,

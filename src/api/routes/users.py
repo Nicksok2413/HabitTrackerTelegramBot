@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, status
 
-from src.api.core.dependencies import DBSession, CurrentUser, UserSvc
+from src.api.core.dependencies import CurrentUser, DBSession, UserSvc
 from src.api.core.logging import api_log as log
 from src.api.models import User
 from src.api.schemas import UserSchemaRead, UserSchemaUpdate
