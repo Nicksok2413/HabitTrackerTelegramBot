@@ -92,7 +92,7 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
             user = await self.repository.get_by_telegram_id(db_session, telegram_id=user_in.telegram_id)
 
             if not user:
-                # Это теоретически невозможно, если БД работает исправно, но для mypy оставляем
+                # Это теоретически невозможно, если база данных работает исправно, но для mypy нужно оставить
                 raise Exception("Критическая ошибка: Пользователь существует (IntegrityError), но не найден.") from None
 
             # Возвращаем найденного пользователя

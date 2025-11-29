@@ -74,6 +74,8 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
 
             # Получаем список доступных колонок для подсказки в ошибке
             available_columns = list(self.repository.model.__table__.columns.keys())
+
+            # Выбрасываем ошибку с информацией о доступных колонках модели
             raise BadRequestException(
                 message=f"Некорректное поле для сортировки: '{sort_by}'. Доступные поля: {available_columns}",
                 error_type="invalid_sort_field",

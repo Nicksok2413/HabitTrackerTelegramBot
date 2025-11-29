@@ -406,6 +406,7 @@ class HabitExecutionService(
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
+
             # Логируем ошибку и выбрасываем исключение
             log.error(f"Ошибка при записи выполнения привычки ID: {habit_id}: {exc}", exc_info=True)
             raise exc
