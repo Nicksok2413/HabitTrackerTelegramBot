@@ -2,7 +2,7 @@
 Эндпоинты для управления привычками (Habits).
 """
 
-from typing import Sequence
+from typing import Annotated, Sequence
 
 from fastapi import APIRouter, Query, status
 
@@ -16,10 +16,7 @@ from src.api.schemas import (
     HabitSchemaUpdate,
 )
 
-router = APIRouter(
-    prefix="/habits",
-    tags=["Habits"],
-)
+router = APIRouter(prefix="/habits", tags=["Habits"])
 
 
 @router.post(
@@ -27,7 +24,7 @@ router = APIRouter(
     response_model=HabitSchemaRead,
     status_code=status.HTTP_201_CREATED,
     summary="Создание новой привычки",
-    description="Создает новую привычку для аутентифицированного пользователя.",
+    description="Создает новую привычку для пользователя.",
 )
 async def create_habit(
     db_session: DBSession,
@@ -42,26 +39,25 @@ async def create_habit(
     - Использует `HabitService` для создания привычки, связывая ее с `current_user`.
     - `target_days` может быть передан или будет взят из настроек по умолчанию.
     """
-    log.info(f"Пользователь ID: {current_user.id} создает привычку: '{habit_in.name}'")
 
     return await habit_service.create_habit_for_user(db_session, habit_in=habit_in, current_user=current_user)
 
 
 @router.get(
     "/",
-    response_model=Sequence[HabitSchemaRead],  # Возвращаем список
+    response_model=Sequence[HabitSchemaRead],
     status_code=status.HTTP_200_OK,
     summary="Получение списка привычек пользователя",
-    description="Возвращает список всех привычек (или только активных) для аутентифицированного пользователя.",
+    description="Возвращает список всех привычек (или только активных) для пользователя.",
 )
-async def read_habits(
+async def get_habits(
     db_session: DBSession,
     current_user: CurrentUser,
     habit_service: HabitSvc,
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска (пагинация)"),
-    limit: int = Query(100, ge=1, le=200, description="Максимальное количество записей (пагинация)"),
+    skip: Annotated[int, Query(ge=0, description="Количество записей для пропуска (пагинация)")] = 0,
+    limit: Annotated[int, Query(ge=1, le=100, description="Максимальное количество записей (пагинация)")] = 20,
     # Параметр для фильтрации активных привычек
-    active_only: bool = Query(False, description="Вернуть только активные привычки"),
+    active_only: Annotated[bool, Query(description="Вернуть только активные привычки")] = False,
 ) -> Sequence[Habit]:
     """
     Получает список привычек для текущего пользователя.
@@ -69,10 +65,6 @@ async def read_habits(
     - Поддерживает пагинацию (`skip`, `limit`).
     - Позволяет фильтровать только активные привычки (`active_only`).
     """
-    log.info(
-        f"Пользователь ID: {current_user.id} запрашивает список привычек "
-        f"(skip={skip}, limit={limit}, active_only={active_only})"
-    )
 
     return await habit_service.get_habits_for_user(
         db_session,
@@ -88,9 +80,9 @@ async def read_habits(
     response_model=HabitSchemaRead,
     status_code=status.HTTP_200_OK,
     summary="Получение конкретной привычки по ID",
-    description="Возвращает детали привычки, если она принадлежит аутентифицированному пользователю.",
+    description="Возвращает привычку, если она принадлежит пользователю.",
 )
-async def read_habit(
+async def get_habit(
     db_session: DBSession,
     current_user: CurrentUser,
     habit_service: HabitSvc,
@@ -101,7 +93,7 @@ async def read_habit(
 
     Проверяет, что привычка принадлежит `current_user`.
     """
-    log.info(f"Пользователь ID: {current_user.id} запрашивает привычку ID: {habit_id}")
+
     return await habit_service.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
 
@@ -109,21 +101,20 @@ async def read_habit(
     "/habits/{habit_id}/details",
     response_model=HabitSchemaReadWithExecutions,
     status_code=status.HTTP_200_OK,
-    summary="Получение конкретной привычки по ID вместе с её выполнениями",
-    description="Возвращает детали привычки, если она принадлежит аутентифицированному пользователю.",
+    summary="Получение конкретной привычки по ID вместе с ее выполнениями",
+    description="Возвращает детали привычки (включая выполнения), если она принадлежит пользователю.",
 )
-async def read_habit_with_details(
+async def get_habit_details(
     db_session: DBSession,
     current_user: CurrentUser,
     habit_service: HabitSvc,
     habit_id: int,
 ) -> Habit:
     """
-    Получает детали одной привычки вместе с её выполнениями по ее ID.
+    Получает детали одной привычки вместе с ее выполнениями по ее ID.
 
     Проверяет, что привычка принадлежит `current_user`.
     """
-    log.info(f"Пользователь ID: {current_user.id} запрашивает привычку (вместе с её выполнениями) ID: {habit_id}")
 
     return await habit_service.get_habit_with_executions_for_user(
         db_session, habit_id=habit_id, current_user=current_user
@@ -135,7 +126,7 @@ async def read_habit_with_details(
     response_model=HabitSchemaRead,
     status_code=status.HTTP_200_OK,
     summary="Обновление привычки по ID",
-    description="Обновляет данные привычки, если она принадлежит аутентифицированному пользователю.",
+    description="Обновляет данные привычки, если она принадлежит пользователю.",
 )
 async def update_habit(
     db_session: DBSession,
@@ -151,7 +142,6 @@ async def update_habit(
     - Проверяет принадлежность привычки `current_user`.
     - Обновляет только переданные поля (частичное обновление).
     """
-    log.info(f"Пользователь ID: {current_user.id} обновляет привычку ID: {habit_id}")
 
     return await habit_service.update_habit_for_user(
         db_session,
@@ -165,7 +155,7 @@ async def update_habit(
     "/{habit_id}",
     status_code=status.HTTP_204_NO_CONTENT,  # Успешное удаление обычно возвращает 204
     summary="Удаление привычки по ID",
-    description="Удаляет привычку, если она принадлежит аутентифицированному пользователю.",
+    description="Удаляет привычку, если она принадлежит пользователю.",
 )
 async def delete_habit(
     db_session: DBSession,
@@ -179,7 +169,6 @@ async def delete_habit(
     - Принимает ID привычки.
     - Проверяет принадлежность привычки `current_user`.
     """
-    log.info(f"Пользователь ID: {current_user.id} удаляет привычку ID: {habit_id}")
 
     await habit_service.remove_habit_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
