@@ -4,7 +4,6 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.config import settings  # Для значения target_days по умолчанию
 from src.api.core.exceptions import ForbiddenException, NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Habit, User
@@ -145,18 +144,10 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         Returns:
             Habit: Созданная привычка.
         """
-        #  Конвертируем в словарь
-        habit_in_data = habit_in.model_dump()
-
-        # Устанавливаем target_days из настроек, если в переданных данных - None
-        if not habit_in_data.get("target_days"):
-            habit_in_data["target_days"] = settings.DAYS_TO_FORM_HABIT
 
         # Создаем новый объект привычки
-        habit_obj = self.repository.model(**habit_in_data, user_id=current_user.id)
-
-        # Добавляем объект в сессию
-        db_session.add(habit_obj)
+        log.info(f"Создание привычки '{habit_in.name}' для пользователя (ID: {current_user.id}).")
+        habit_obj = await self.repository.create_habit(db_session, habit_in=habit_in, user_id=current_user.id)
 
         try:
             # Фиксируем транзакцию (бизнес-операция завершена успешно)
@@ -165,15 +156,18 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             # Обновляем данные из базы данных
             await db_session.refresh(habit_obj)
 
-            # Логируем успех
+            # Логируем успешное создание привычки
             log.info(f"Привычка ID {habit_obj.id} для пользователя (ID: {current_user.id}) успешно создана.")
-            # Возвращаем созданный объект привычки
+
+            # Возвращаем объект созданной привычки
             return habit_obj
+
         except Exception as exc:
             # При любой ошибке откатываем транзакцию, чтобы сохранить целостность данных
             await db_session.rollback()
+
             # Логируем ошибку и выбрасываем исключение
-            log.error(f"Ошибка при создании привычки для пользователя ID: {current_user.id}: {exc}", exc_info=True)
+            log.error(f"Ошибка при создании привычки для пользователя (ID: {current_user.id}): {exc}", exc_info=True)
             raise exc
 
     async def update_habit_for_user(

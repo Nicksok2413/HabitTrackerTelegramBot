@@ -6,6 +6,7 @@ from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.api.core.config import settings  # Для значения target_days по умолчанию
 from src.api.core.logging import api_log as log
 from src.api.models import Habit
 from src.api.repositories import BaseRepository
@@ -37,25 +38,26 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         Returns:
             Habit: Созданная привычка.
         """
-        log.info(f"Создание привычки '{habit_in.name}' для пользователя ID: {user_id}")
 
         # Конвертируем в словарь
         habit_in_data = habit_in.model_dump()
 
+        # Устанавливаем target_days из настроек, если в переданных данных - None
+        if not habit_in_data.get("target_days"):
+            habit_in_data["target_days"] = settings.DAYS_TO_FORM_HABIT
+
         # Подготавливаем объект привычки
-        habit_obj = self.model(
-            **habit_in_data,
-            user_id=user_id,
-        )
+        habit_obj = self.model(**habit_in_data, user_id=user_id)
 
         # Добавляем объект привычки в сессию
         db_session.add(habit_obj)
+
         # Получаем ID и другие сгенерированные базой данных значения
         await db_session.flush()
+
         # Обновляем объект привычки из базы данных
         await db_session.refresh(habit_obj)
-        # Логируем успешное создание привычки
-        log.info(f"Привычка (ID: {habit_obj.id}) успешно создана для пользователя ID: {user_id}.")
+
         # Возвращаем созданную привычку
         return habit_obj
 
