@@ -131,9 +131,6 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         Returns:
             Sequence[Habit]: Список привычек пользователя.
         """
-        log.debug(
-            f"Получение привычек для пользователя ID: {user_id}, skip={skip}, limit={limit}, active_only={active_only})"
-        )
 
         # Явно указываем тип списка: list[ColumnElement[bool]]
         # Это говорит mypy, что внутри лежат SQL-выражения, возвращающие булево значение (WHERE ...)

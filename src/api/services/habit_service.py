@@ -45,6 +45,8 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             NotFoundException: Если привычка не найдена.
             ForbiddenException: Если привычка не принадлежит пользователю.
         """
+        log.info(f"Пользователь (ID {current_user.id}) запрашивает привычку ID: {habit_id}")
+
         # Проверка существования привычки
         # Если объект привычки не найден, будет выброшено исключение
         habit = await self.get_by_id(db_session, obj_id=habit_id)
@@ -52,7 +54,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         # Если объект привычки найден, проверяем его принадлежность текущему пользователю
         if habit.user_id != current_user.id:
             # Если пользователи не совпадают, логируем и выбрасываем исключение
-            log.warning(f"Пользователь ID: {current_user.id} пытался получить доступ к чужой привычке ID: {habit_id}")
+            log.warning(f"Пользователь (ID {current_user.id}) пытался получить доступ к чужой привычке ID: {habit_id}")
             raise ForbiddenException(
                 message="У вас нет прав для доступа к этой привычке.",
                 error_type="habit_access_forbidden",
@@ -118,6 +120,11 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         Returns:
             Sequence[Habit]: Список привычек пользователя.
         """
+        log.debug(
+            f"Получение привычек для пользователя (ID {current_user.id}). "
+            f"(skip={skip}, limit={limit}, active_only={active_only})"
+        )
+
         return await self.repository.get_habits_by_user_id(
             db_session,
             user_id=current_user.id,
@@ -196,7 +203,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
         # Если проверки прошли, значит привычка существует и принадлежит пользователю
         # Обновляем объект привычки
-        log.info(f"Обновление привычки ID: {habit_id} для пользователя ID: {current_user.id}")
+        log.info(f"Обновление привычки ID: {habit_id} для пользователя (ID {current_user.id}).")
         return await super().update(db_session, db_obj=habit_to_update, obj_id=habit_to_update.id, obj_in=habit_in)
 
     async def remove_habit_for_user(self, db_session: AsyncSession, *, habit_id: int, current_user: User) -> None:
@@ -213,5 +220,5 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
         # Если проверки прошли, значит привычка существует и принадлежит пользователю
         # Удаляем объект привычки
-        log.info(f"Удаление привычки ID: {habit_id} для пользователя ID: {current_user.id}")
+        log.info(f"Удаление привычки ID: {habit_id} для пользователя (ID {current_user.id}).")
         return await super().delete(db_session, db_obj=habit_to_remove, obj_id=habit_to_remove.id)
