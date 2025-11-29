@@ -1,186 +1,66 @@
 """
-Эндпоинты для управления привычками (Habits).
+Эндпоинты для работы с пользователями.
 """
 
-from typing import Sequence
+from fastapi import APIRouter, status
 
-from fastapi import APIRouter, Query, status
-
-from src.api.core.dependencies import CurrentUser, DBSession, HabitSvc
+from src.api.core.dependencies import DBSession, CurrentUser, UserSvc
 from src.api.core.logging import api_log as log
-from src.api.models import Habit
-from src.api.schemas import (
-    HabitSchemaCreate,
-    HabitSchemaRead,
-    HabitSchemaReadWithExecutions,
-    HabitSchemaUpdate,
-)
+from src.api.models import User
+from src.api.schemas import UserSchemaRead, UserSchemaUpdate
 
-router = APIRouter(
-    prefix="/habits",
-    tags=["Habits"],
-)
-
-
-@router.post(
-    "/",
-    response_model=HabitSchemaRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создание новой привычки",
-    description="Создает новую привычку для аутентифицированного пользователя.",
-)
-async def create_habit(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_in: HabitSchemaCreate,
-) -> Habit:
-    """
-    Создает новую привычку.
-
-    - Принимает данные привычки в теле запроса.
-    - Использует `HabitService` для создания привычки, связывая ее с `current_user`.
-    - `target_days` может быть передан или будет взят из настроек по умолчанию.
-    """
-    log.info(f"Пользователь ID: {current_user.id} создает привычку: '{habit_in.name}'")
-
-    return await habit_service.create_habit_for_user(db_session, habit_in=habit_in, current_user=current_user)
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get(
-    "/",
-    response_model=Sequence[HabitSchemaRead],  # Возвращаем список
+    "/me",
+    response_model=UserSchemaRead,
     status_code=status.HTTP_200_OK,
-    summary="Получение списка привычек пользователя",
-    description="Возвращает список всех привычек (или только активных) для аутентифицированного пользователя.",
+    summary="Получение информации о текущем пользователе",
+    description="Возвращает данные аутентифицированного пользователя на основе JWT токена.",
 )
-async def read_habits(
+async def read_users_me(current_user: CurrentUser) -> User:
+    """
+    Возвращает информацию о текущем аутентифицированном пользователе.
+
+    Зависимость `CurrentUser` обрабатывает аутентификацию и возвращает
+    объект `User` из базы данных.
+    """
+    log.info(f"Запрос информации о текущем пользователе: ID {current_user.id}")
+    return current_user
+
+
+# Здесь можно добавить эндпоинты для обновления данных пользователя самим пользователем,
+# если это предусмотрено (например, смена username, если Telegram это позволяет через API).
+# Однако, основное обновление данных пользователя (first_name, last_name, username)
+# может происходить при каждом вызове /auth/token ботом, если данные изменились в Telegram.
+# Метод UserService.update_user_by_telegram_id может быть вызван внутри /auth/token.
+
+
+@router.patch(
+    "/me",
+    response_model=UserSchemaRead,
+    status_code=status.HTTP_200_OK,
+    summary="Обновление информации о текущем пользователе",
+    description="Позволяет текущему аутентифицированному пользователю обновить свои данные.",
+)
+async def update_user_me(
     db_session: DBSession,
     current_user: CurrentUser,
-    habit_service: HabitSvc,
-    skip: int = Query(0, ge=0, description="Количество записей для пропуска (пагинация)"),
-    limit: int = Query(100, ge=1, le=200, description="Максимальное количество записей (пагинация)"),
-    # Параметр для фильтрации активных привычек
-    active_only: bool = Query(False, description="Вернуть только активные привычки"),
-) -> Sequence[Habit]:
+    user_service: UserSvc,
+    user_update_data: UserSchemaUpdate,
+) -> User:
     """
-    Получает список привычек для текущего пользователя.
-
-    - Поддерживает пагинацию (`skip`, `limit`).
-    - Позволяет фильтровать только активные привычки (`active_only`).
+    Обновляет данные текущего аутентифицированного пользователя.
+    Использует `telegram_id` из `current_user` для поиска и обновления.
     """
-    log.info(
-        f"Пользователь ID: {current_user.id} запрашивает список привычек "
-        f"(skip={skip}, limit={limit}, active_only={active_only})"
-    )
+    log.info(f"Обновление данных для пользователя ID: {current_user.id} (Telegram ID: {current_user.telegram_id})")
 
-    return await habit_service.get_habits_for_user(
+    updated_user = await user_service.update_user_by_telegram_id(
         db_session,
-        current_user=current_user,
-        skip=skip,
-        limit=limit,
-        active_only=active_only,
+        telegram_id=current_user.telegram_id,  # Обновляем по telegram_id текущего пользователя
+        user_update_data=user_update_data,
     )
 
-
-@router.get(
-    "/{habit_id}",
-    response_model=HabitSchemaRead,
-    status_code=status.HTTP_200_OK,
-    summary="Получение конкретной привычки по ID",
-    description="Возвращает детали привычки, если она принадлежит аутентифицированному пользователю.",
-)
-async def read_habit(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_id: int,
-) -> Habit:
-    """
-    Получает детали одной привычки по ее ID.
-
-    Проверяет, что привычка принадлежит `current_user`.
-    """
-    log.info(f"Пользователь ID: {current_user.id} запрашивает привычку ID: {habit_id}")
-    return await habit_service.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)
-
-
-@router.get(
-    "/habits/{habit_id}/details",
-    response_model=HabitSchemaReadWithExecutions,
-    status_code=status.HTTP_200_OK,
-    summary="Получение конкретной привычки по ID вместе с её выполнениями",
-    description="Возвращает детали привычки, если она принадлежит аутентифицированному пользователю.",
-)
-async def read_habit_with_details(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_id: int,
-) -> Habit:
-    """
-    Получает детали одной привычки вместе с её выполнениями по ее ID.
-
-    Проверяет, что привычка принадлежит `current_user`.
-    """
-    log.info(f"Пользователь ID: {current_user.id} запрашивает привычку (вместе с её выполнениями) ID: {habit_id}")
-
-    return await habit_service.get_habit_with_executions_for_user(
-        db_session, habit_id=habit_id, current_user=current_user
-    )
-
-
-@router.put(
-    "/{habit_id}",
-    response_model=HabitSchemaRead,
-    status_code=status.HTTP_200_OK,
-    summary="Обновление привычки по ID",
-    description="Обновляет данные привычки, если она принадлежит аутентифицированному пользователю.",
-)
-async def update_habit(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_id: int,
-    habit_in: HabitSchemaUpdate,
-) -> Habit:
-    """
-    Обновляет существующую привычку.
-
-    - Принимает ID привычки и данные для обновления.
-    - Проверяет принадлежность привычки `current_user`.
-    - Обновляет только переданные поля (частичное обновление).
-    """
-    log.info(f"Пользователь ID: {current_user.id} обновляет привычку ID: {habit_id}")
-
-    return await habit_service.update_habit_for_user(
-        db_session,
-        habit_id=habit_id,
-        habit_in=habit_in,
-        current_user=current_user,
-    )
-
-
-@router.delete(
-    "/{habit_id}",
-    status_code=status.HTTP_204_NO_CONTENT,  # Успешное удаление обычно возвращает 204
-    summary="Удаление привычки по ID",
-    description="Удаляет привычку, если она принадлежит аутентифицированному пользователю.",
-)
-async def delete_habit(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_id: int,
-) -> None:  # Возвращаем None, так как статус 204 No Content
-    """
-    Удаляет привычку.
-
-    - Принимает ID привычки.
-    - Проверяет принадлежность привычки `current_user`.
-    """
-    log.info(f"Пользователь ID: {current_user.id} удаляет привычку ID: {habit_id}")
-
-    await habit_service.remove_habit_for_user(db_session, habit_id=habit_id, current_user=current_user)
-
-    return None  # Для статуса 204 тело ответа должно быть пустым
+    log.info(f"Данные пользователя ID {current_user.id} успешно обновлены.")
+    return updated_user
