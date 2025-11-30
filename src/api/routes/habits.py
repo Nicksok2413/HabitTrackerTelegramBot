@@ -2,7 +2,7 @@
 Эндпоинты для управления привычками (Habits).
 """
 
-from typing import Annotated, Sequence
+from typing import Sequence
 
 from fastapi import APIRouter, Query, status
 
@@ -53,10 +53,10 @@ async def get_habits(
     db_session: DBSession,
     current_user: CurrentUser,
     habit_service: HabitSvc,
-    skip: Annotated[int, Query(ge=0, description="Количество записей для пропуска (пагинация)")] = 0,
-    limit: Annotated[int, Query(ge=1, le=100, description="Максимальное количество записей (пагинация)")] = 20,
+    skip: int = Query(0, ge=0, description="Количество записей для пропуска (пагинация)"),
+    limit: int = Query(100, ge=1, le=200, description="Максимальное количество записей (пагинация)"),
     # Параметр для фильтрации активных привычек
-    active_only: Annotated[bool, Query(description="Вернуть только активные привычки")] = False,
+    active_only: bool = Query(False, description="Вернуть только активные привычки"),
 ) -> Sequence[Habit]:
     """
     Получает список привычек для текущего пользователя.
