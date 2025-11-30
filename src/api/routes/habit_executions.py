@@ -8,7 +8,6 @@ from typing import Sequence
 from fastapi import APIRouter, HTTPException, Path, Query, status
 
 from src.api.core.dependencies import CurrentUser, DBSession, HabitExecutionSvc
-
 from src.api.core.logging import api_log as log
 from src.api.models import HabitExecution, HabitExecutionStatus
 from src.api.schemas.habit_execution_schema import (
@@ -181,7 +180,5 @@ async def read_habit_execution_details(
     """
 
     return await execution_service.get_execution_with_habit(
-        db_session,
-        execution_id=execution_id,
-        current_user=current_user
+        db_session, execution_id=execution_id, current_user=current_user
     )
