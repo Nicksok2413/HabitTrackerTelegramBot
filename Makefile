@@ -27,7 +27,8 @@ help:
 	@echo "  types          - Проверить статическую типизацию mypy"
 	@echo "  test           - Запустить тесты pytest"
 	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
-	@echo "  check          - Запустить все проверки (lint, format-check, types, test) последовательно"
+	@echo "  check          - Запустить статический анализ (lint, format-check, types) последовательно"
+	@echo "  check-all      - Запустить все проверки (lint, format-check, types, test) последовательно"
 	@echo ""
 	@echo "Управление миграциями базы данных:"
 	@echo "  migrate        - Применить миграции Alembic"
@@ -101,8 +102,11 @@ test-cov:
 	@echo "-> Запуск тестов pytest с отчетом о покрытии..."
 	poetry run pytest --cov=src/ --cov-report=term-missing --cov-report=html
 
-check: lint format-check types test
-	@echo "-> Все проверки успешно пройдены!"
+check: lint format-check types
+	@echo "-> Статический анализ (lint, format, types) успешно пройден!"
+
+check-all: lint format-check types test
+	@echo "-> Все проверки (включая тесты) успешно пройдены!"
 
 # ------------------------------------------------------------------------------
 # Управление миграциями БД
