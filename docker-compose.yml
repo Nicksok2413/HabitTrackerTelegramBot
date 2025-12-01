@@ -51,24 +51,23 @@ services:
     command: python -m alembic -c pyproject.toml upgrade head
     restart: "no"
 
+  # Сервис Телеграм-бота
+  bot:
+    build:
+      context: .  # Контекст сборки - корень проекта
+      dockerfile: docker/bot/Dockerfile # Путь к Dockerfile для Телеграм-бота
+    container_name: habit_tracker_bot
+    env_file: .env  # Передаем все переменные из .env в контейнер
+    volumes:
+      - bot_logs:/logs  # Монтируем том для логов
+    depends_on:
+      api:
+        condition: service_started # Бот ждет запуска API
+    restart: unless-stopped
+    networks:
+      - backend
 
   # --- Заглушки для будущих сервисов ---
-
-  # bot:
-  #   build:
-  #     context: .  # Контекст сборки - корень проекта
-  #     dockerfile: docker/bot/Dockerfile  # Путь к Dockerfile для Телеграм-бота
-  #   container_name: habit_tracker_bot
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - bot_logs:/logs  # Монтируем том для логов
-  #   depends_on:
-  #     - api
-  #   restart: unless-stopped
-  #   networks:
-  #     - backend
-
   # scheduler:
   #   build:
   #     context: .  # Контекст сборки - корень проекта
@@ -90,8 +89,8 @@ volumes:
     driver: local
   api_logs:
     driver: local
-#  bot_logs:
-#    driver: local
+  bot_logs:
+    driver: local
 #  scheduler_logs:
 #    driver: local
 
