@@ -77,9 +77,9 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,  # Имена переменных окружения не чувствительны к регистру
-        extra="ignore",  # Игнорировать лишние переменные окружения
+        extra="ignore",  # Игнорировать лишние переменные  .env
     )
 
 
-# Кэшированный экземпляр настроек
+# Создаем глобальный экземпляр настроек
 settings = Settings()  # type: ignore[call-arg]
