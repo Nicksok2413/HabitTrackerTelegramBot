@@ -96,30 +96,6 @@ async def get_habit(
     return await habit_service.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
 
-@router.get(
-    "/habits/{habit_id}/details",
-    response_model=HabitSchemaReadWithExecutions,
-    status_code=status.HTTP_200_OK,
-    summary="Получение конкретной привычки по ID вместе с ее выполнениями",
-    description="Возвращает детали привычки (включая выполнения), если она принадлежит пользователю.",
-)
-async def get_habit_details(
-    db_session: DBSession,
-    current_user: CurrentUser,
-    habit_service: HabitSvc,
-    habit_id: int,
-) -> Habit:
-    """
-    Получает детали одной привычки вместе с ее выполнениями по ее ID.
-
-    Проверяет, что привычка принадлежит `current_user`.
-    """
-
-    return await habit_service.get_habit_with_executions_for_user(
-        db_session, habit_id=habit_id, current_user=current_user
-    )
-
-
 @router.put(
     "/{habit_id}",
     response_model=HabitSchemaRead,
@@ -172,3 +148,27 @@ async def delete_habit(
     await habit_service.remove_habit_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
     return None  # Для статуса 204 тело ответа должно быть пустым
+
+
+@router.get(
+    "/{habit_id}/details",
+    response_model=HabitSchemaReadWithExecutions,
+    status_code=status.HTTP_200_OK,
+    summary="Получение конкретной привычки по ID вместе с ее выполнениями",
+    description="Возвращает детали привычки (включая выполнения), если она принадлежит пользователю.",
+)
+async def get_habit_details(
+    db_session: DBSession,
+    current_user: CurrentUser,
+    habit_service: HabitSvc,
+    habit_id: int,
+) -> Habit:
+    """
+    Получает детали одной привычки вместе с ее выполнениями по ее ID.
+
+    Проверяет, что привычка принадлежит `current_user`.
+    """
+
+    return await habit_service.get_habit_with_executions_for_user(
+        db_session, habit_id=habit_id, current_user=current_user
+    )
