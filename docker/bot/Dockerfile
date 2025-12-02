@@ -52,7 +52,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
-    HOME="/home/appuser"
+    HOME="/home/appuser" \
+    PYTHONPATH="/app"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -76,8 +77,6 @@ RUN chown appuser:appgroup /app
 # Копируем код и сразу устанавливая правильного владельца
 COPY --chown=appuser:appgroup ./src/bot ./src/bot
 COPY --chown=appuser:appgroup ./src/core_shared ./src/core_shared
-
-USER appuser
 
 # Устанавливаем скрипт как точку входа (он будет выполнен перед основной командой контейнера)
 ENTRYPOINT ["/entrypoint.sh"]
