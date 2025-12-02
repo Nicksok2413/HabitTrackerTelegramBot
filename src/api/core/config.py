@@ -1,5 +1,7 @@
 """Конфигурация приложения."""
 
+from urllib.parse import quote_plus
+
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -71,7 +73,12 @@ class Settings(BaseSettings):
     @computed_field(repr=False)
     def DATABASE_URL(self) -> str:
         """Собирает URL для SQLAlchemy."""
-        return f"postgresql+psycopg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+        # Экранируем пользователя и пароль, чтобы спецсимволы не ломали URL
+        encoded_user = quote_plus(self.DB_USER)
+        encoded_password = quote_plus(self.DB_PASSWORD)
+
+        return f"postgresql+psycopg://{encoded_user}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(
         env_file=".env",
