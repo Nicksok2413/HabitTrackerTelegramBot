@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from src.bot.services.api_client import HabitTrackerClient, APIClientError
 from src.core_shared.logging_setup import setup_logger
 
+# Настраиваем логгер
 log = setup_logger("BotHandlers")
 
 # Создаем роутер для регистрации хендлеров
@@ -43,7 +44,7 @@ async def cmd_start(message: Message, api_client: HabitTrackerClient, state: FSM
 
     try:
         # Делаем пробный запрос к API, чтобы зарегистрировать пользователя
-        # Нам не важен результат, важен факт успешной авторизации
+        # Не важен результат, важен факт успешной авторизации
         await api_client.get_my_habits(message.from_user, limit=1)
 
         await message.answer(
@@ -68,8 +69,13 @@ async def cmd_cancel(message: Message, state: FSMContext):
     """
     Команда отмены текущего действия.
     Сбрасывает состояние FSM.
+
+    Args:
+        message (Message): Объект сообщения от Telegram.
+        state (FSMContext): Контекст машины состояний.
     """
     current_state = await state.get_state()
+
     if current_state is None:
         await message.answer("Нет активных действий для отмены.")
         return
