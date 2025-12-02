@@ -57,6 +57,8 @@ services:
       context: .  # Контекст сборки - корень проекта
       dockerfile: docker/bot/Dockerfile # Путь к Dockerfile для Телеграм-бота
     container_name: habit_tracker_bot
+    # Команда для запуска бота (будет передана в entrypoint как "$@")
+    command: python src/bot/main.py
     env_file: .env  # Передаем все переменные из .env в контейнер
     volumes:
       - bot_logs:/logs  # Монтируем том для логов
