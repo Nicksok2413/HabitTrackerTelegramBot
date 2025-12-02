@@ -22,6 +22,7 @@ class APIClientError(Exception):
     Базовое исключение для ошибок, возникающих при работе с API.
     Используется для того, чтобы не пробрасывать httpx exceptions в логику бота.
     """
+
     pass
 
 
@@ -80,11 +81,7 @@ class HabitTrackerClient:
         headers = {"X-BOT-API-KEY": self.shared_key}
 
         try:
-            response = await self.http_client.post(
-                "/auth/token",
-                json=payload,
-                headers=headers
-            )
+            response = await self.http_client.post("/auth/token", json=payload, headers=headers)
 
             # Если статус ответа 4xx или 5xx, выбрасываем исключение
             response.raise_for_status()
@@ -104,12 +101,12 @@ class HabitTrackerClient:
             raise APIClientError("Внутренняя ошибка клиента.")
 
     async def _request(
-            self,
-            method: str,
-            endpoint: str,
-            tg_user: TelegramUser,
-            json: dict[str, Any] | None = None,
-            params: dict[str, Any] | None = None
+        self,
+        method: str,
+        endpoint: str,
+        tg_user: TelegramUser,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         """
         Внутренний метод для выполнения авторизованного запроса к API.
@@ -138,13 +135,7 @@ class HabitTrackerClient:
 
             # Выполняем запрос
             log.debug(f"API Request: {method} {endpoint} | User: {tg_user.id}")
-            response = await self.http_client.request(
-                method,
-                endpoint,
-                json=json,
-                params=params,
-                headers=headers
-            )
+            response = await self.http_client.request(method, endpoint, json=json, params=params, headers=headers)
 
             # Если статус ответа 4xx или 5xx, выбрасываем исключение
             response.raise_for_status()
@@ -172,11 +163,7 @@ class HabitTrackerClient:
     # --- Публичные методы API (Бизнес-логика) ---
 
     async def get_my_habits(
-            self,
-            tg_user: TelegramUser,
-            skip: int = 0,
-            limit: int = 100,
-            active_only: bool = False
+        self, tg_user: TelegramUser, skip: int = 0, limit: int = 100, active_only: bool = False
     ) -> list[dict[str, Any]]:
         """
         Получает список привычек текущего пользователя.
@@ -190,17 +177,17 @@ class HabitTrackerClient:
         params = {
             "skip": skip,
             "limit": limit,
-            "active_only": str(active_only).lower()  # API ожидает 'true'/'false'
+            "active_only": str(active_only).lower(),  # API ожидает 'true'/'false'
         }
         return await self._request("GET", "/habits/", tg_user, params=params)
 
     async def create_habit(
-            self,
-            tg_user: TelegramUser,
-            name: str,
-            time_to_remind: str,
-            description: str | None = None,
-            target_days: int | None = None
+        self,
+        tg_user: TelegramUser,
+        name: str,
+        time_to_remind: str,
+        description: str | None = None,
+        target_days: int | None = None,
     ) -> dict[str, Any]:
         """
         Создает новую привычку.
@@ -216,6 +203,6 @@ class HabitTrackerClient:
             "name": name,
             "time_to_remind": time_to_remind,
             "description": description,
-            "target_days": target_days
+            "target_days": target_days,
         }
         return await self._request("POST", "/habits/", tg_user, json=payload)
