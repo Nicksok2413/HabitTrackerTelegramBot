@@ -66,7 +66,7 @@ APP_GROUP=appgroup
 # Используем chown для изменения владельца точки монтирования тома
 # Делаем это под root перед понижением привилегий
 if [ -d "/logs" ]; then
-    echo "-> (API Entrypoint) Выдача прав на /app/logs..."
+    echo "-> (API Entrypoint) Выдача прав на /logs..."
     chown -R "${APP_USER}:${APP_GROUP}" /logs
     echo "-> (API Entrypoint) Права установлены."
 fi
