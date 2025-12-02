@@ -30,10 +30,7 @@ async def main():
 
     # Инициализация бота
     # parse_mode=ParseMode.HTML позволяет использовать HTML теги в сообщениях
-    bot = Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
+    bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
     # Инициализация диспетчера
     # Диспетчер обрабатывает входящие обновления и маршрутизирует их в хендлеры
