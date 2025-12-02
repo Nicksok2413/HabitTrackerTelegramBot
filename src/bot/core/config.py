@@ -22,10 +22,7 @@ class Settings(BaseSettings):
     # --- Настройки подключения к Backend API ---
     # В Docker-сети hostname сервиса API - "api"
     # При локальном запуске вне докера может потребоваться http://localhost:8000
-    API_BASE_URL: str = Field(
-        default="http://api:8000",
-        description="Базовый URL для подключения к Backend API"
-    )
+    API_BASE_URL: str = Field(default="http://api:8000", description="Базовый URL для подключения к Backend API")
 
     # Секретный ключ для межсервисной аутентификации (Бот -> API)
     # Используется для аутентификации бота на стороне API и чтобы бот мог запрашивать JWT токены от имени пользователей
