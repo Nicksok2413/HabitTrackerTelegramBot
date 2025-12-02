@@ -30,8 +30,7 @@ RUN wget -O su-exec.tar.gz https://github.com/ncopa/su-exec/archive/master.tar.g
     rm -rf su-exec.tar.gz su-exec-master
 
 # Обновляем pip и устанавливаем Poetry
-RUN pip install --upgrade pip && \
-    pip install poetry
+RUN pip install --upgrade pip && pip install poetry
 
 # Копируем файлы, определяющие зависимости
 COPY pyproject.toml poetry.lock ./
