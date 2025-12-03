@@ -33,7 +33,7 @@ class HabitDetailCallback(CallbackData, prefix="habit_detail"):
     page: int
 
 
-class HabitActionCallback(CallbackData, prefix="habit"):
+class HabitActionCallback(CallbackData, prefix="habit_action"):
     """
     Данные, связанные с действиями над конкретной привычкой.
 
@@ -45,8 +45,10 @@ class HabitActionCallback(CallbackData, prefix="habit"):
             - "done": Отметка выполнения.
             - "delete": Удаление привычки.
             - "confirm_delete": Подтверждение удаления.
+        page (int): Номер страницы для возврата.
     """
     id: int
     action: str
+    page: str
 
 
