@@ -168,11 +168,16 @@ class HabitTrackerClient:
         """
         Получает список привычек текущего пользователя.
 
+        Использует эндпоинт GET /habits/.
+
         Args:
-            tg_user: Пользователь Telegram.
-            skip: Пагинация (пропустить).
-            limit: Пагинация (лимит).
-            active_only: Фильтр по активным привычкам.
+            tg_user (TelegramUser): Пользователь Telegram.
+            skip (int): Пагинация (пропустить).
+            limit (int): Пагинация (лимит).
+            active_only (bool): Фильтр по активным привычкам.
+
+        Returns:
+            list (dict[str, Any]): список JSON-объектов привычек пользователя.
         """
         params = {
             "skip": skip,
@@ -180,6 +185,21 @@ class HabitTrackerClient:
             "active_only": str(active_only).lower(),  # API ожидает 'true'/'false'
         }
         return await self._request("GET", "/habits/", tg_user, params=params)
+
+    async def get_habit_details(self, tg_user: TelegramUser, habit_id: int) -> dict[str, Any]:
+        """
+        Получает полную информацию о привычке, включая историю выполнений.
+
+        Использует эндпоинт GET /habits/{id}/details.
+
+        Args:
+            tg_user (TelegramUser): Пользователь Telegram.
+            habit_id (int): ID привычки.
+
+        Returns:
+            dict[str, Any]: Словарь с данными привычки (с полем 'executions').
+        """
+        return await self._request("GET", f"/habits/habits/{habit_id}/details", tg_user)
 
     async def create_habit(
         self,
@@ -192,12 +212,17 @@ class HabitTrackerClient:
         """
         Создает новую привычку.
 
+        Использует эндпоинт POST /habits/.
+
         Args:
-            tg_user: Пользователь Telegram.
-            name: Название привычки.
-            time_to_remind: Время напоминания (HH:MM).
-            description: Описание (опционально).
-            target_days: Целевое кол-во дней (опционально).
+            tg_user (TelegramUser): Пользователь Telegram.
+            name (str): Название привычки.
+            time_to_remind (str): Время напоминания (ЧЧ:MM).
+            description (str | None): Описание (опционально).
+            target_days (int | None): Целевое кол-во дней (опционально).
+
+        Returns:
+            dict[str, Any]: JSON-объект привычки.
         """
         payload = {
             "name": name,
@@ -206,3 +231,33 @@ class HabitTrackerClient:
             "target_days": target_days,
         }
         return await self._request("POST", "/habits/", tg_user, json=payload)
+
+    async def execute_habit(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
+        """
+        Фиксирует выполнение привычки на сегодняшний день.
+
+        Использует эндпоинт POST /habits/{id}/executions/.
+
+        Args:
+            tg_user (TelegramUser): Пользователь Telegram.
+            habit_id (int): ID привычки.
+            status (str): Статус выполнения ("done", "not_done"). По умолчанию "done".
+
+        Returns:
+            dict[str, Any]: Словарь с данными объекта созданного выполнения.
+        """
+        payload = {"status": status}
+
+        return await self._request("POST", f"/habits/{habit_id}/executions/", tg_user, json=payload)
+
+    async def delete_habit(self, tg_user: TelegramUser, habit_id: int) -> None:
+        """
+        Удаляет привычку.
+
+        Использует эндпоинт DELETE /habits/{id}.
+
+        Args:
+            tg_user (TelegramUser): Пользователь Telegram.
+            habit_id (int): ID привычки.
+        """
+        await self._request("DELETE", f"/habits/{habit_id}", tg_user)
