@@ -1,0 +1,123 @@
+"""
+Генераторы Inline-клавиатур (кнопок под сообщениями).
+
+Содержит функции для создания клавиатур списка привычек (с пагинацией),
+детального просмотра и меню действий с конкретной привычкой.
+"""
+
+from typing import Any
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from src.bot.keyboards.callbacks import (
+    HabitDetailCallback,
+    HabitsNavigationCallback,
+    HabitActionCallback
+)
+
+
+def get_habits_list_keyboard(
+        habits: list[dict[str, Any]],
+        page: int,
+        has_next: bool
+) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру со списком привычек и кнопками навигации.
+
+    Args:
+        habits (list): Список словарей с данными привычек.
+        page (int): Номер текущей страницы (начиная с 0).
+        has_next (bool): Флаг, указывающий, есть ли следующая страница.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура списка.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Генерируем кнопку для каждой привычки
+    for habit in habits:
+        # Визуальная индикация: огонек, если есть стрик > 0
+        status_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
+        button_text = f"{status_icon} {habit['name']}"
+
+        # При нажатии передаем ID и действие 'view'
+        builder.button(
+            text=button_text,
+            callback_data=HabitActionCallback(id=habit["id"], action="view")
+        )
+
+    # Настраиваем макет: каждая привычка на новой строке (1 колонка)
+    builder.adjust(1)
+
+    # Формируем ряд кнопок навигации (Pagination)
+    nav_buttons = []
+
+    # Кнопка "Назад", если это не первая страница
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data=HabitsNavigationCallback(page=page - 1).pack()
+            )
+        )
+
+    # Кнопка "Вперед", если есть данные дальше
+    if has_next:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="Вперед ➡️",
+                callback_data=HabitsNavigationCallback(page=page + 1).pack()
+            )
+        )
+
+    # Добавляем ряд навигации в билдер, если кнопки есть
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    return builder.as_markup()
+
+
+def get_habit_details_keyboard(habit_id: int, is_done_today: bool = False) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру управления конкретной привычкой.
+
+    Args:
+        habit_id (int): ID привычки.
+        is_done_today (bool): Выполнена ли привычка сегодня.
+                              Влияет на отображение кнопки выполнения.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Кнопка выполнения
+    # Если уже выполнено, показываем просто информативную кнопку "Уже выполнено".
+    if not is_done_today:
+        builder.button(
+            text="✅ Выполнить сегодня",
+            callback_data=HabitActionCallback(id=habit_id, action="done")
+        )
+    else:
+        builder.button(
+            text="🏆 Уже выполнено!",
+            callback_data="noop"  # No Operation
+        )
+
+    # Кнопка удаления
+    builder.button(
+        text="🗑 Удалить",
+        callback_data=HabitActionCallback(id=habit_id, action="delete")
+    )
+
+    # Кнопка возврата к списку (всегда на первую страницу для простоты)
+    builder.button(
+        text="🔙 К списку",
+        callback_data=HabitsNavigationCallback(page=0).pack()
+    )
+
+    # Расположение: [Выполнить] (новая строка) [Удалить] (новая строка) [Назад]
+    builder.adjust(1)
+
+    return builder.as_markup()
