@@ -184,11 +184,11 @@ async def process_habit_time(
         await processing_msg.delete()
 
         # Формируем красивый ответ
-        desc_text = f"\n<i>{new_habit['description']}</i>" if new_habit.get('description') else ""
+        habit_description_text = f"\n<i>{new_habit['description']}</i>" if new_habit.get('description') else ""
 
         await message.answer(
             f"🎉 <b>Привычка успешно создана!</b>\n\n"
-            f"📌 <b>{new_habit['name']}</b>{desc_text}\n"
+            f"📌 <b>{new_habit['name']}</b>{habit_description_text}\n"
             f"⏰ Напоминание в: <b>{new_habit['time_to_remind']}</b>\n"
             f"📅 Цель: <b>{new_habit['target_days']} дней</b>\n\n"
             f"Удачи в достижении цели! 💪",
