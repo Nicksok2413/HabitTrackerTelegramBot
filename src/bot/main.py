@@ -16,7 +16,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from src.bot.core.config import settings
-from src.bot.handlers import common
+from src.bot.handlers import common, habits
 from src.bot.services.api_client import HabitTrackerClient
 from src.core_shared.logging_setup import setup_logger
 
@@ -46,9 +46,9 @@ async def main():
     dp["api_client"] = api_client
 
     # Регистрация роутеров (хендлеров)
-    # Порядок важен! Специфичные хендлеры должны быть выше общих
+    dp.include_router(habits.router)
     dp.include_router(common.router)
-    # dp.include_router(habits.router) # Добавим позже
+
 
     try:
         # Удаляем вебхук и очищаем очередь обновлений, накопившихся пока бот спал
