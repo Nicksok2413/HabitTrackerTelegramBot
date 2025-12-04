@@ -35,7 +35,7 @@ def get_habits_list_keyboard(
     """
     builder = InlineKeyboardBuilder()
 
-    # Генерируем кнопку для каждой привычки
+    # Генерируем кнопки для каждой привычки
     for habit in habits:
         # Визуальная индикация: огонек, если есть стрик > 0
         status_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
@@ -44,7 +44,7 @@ def get_habits_list_keyboard(
         # При нажатии передаем ID и действие 'view'
         builder.button(
             text=button_text,
-            callback_data=HabitActionCallback(id=habit["id"], action="view")
+            callback_data=HabitDetailCallback(habit_id=habit["id"], page=page)
         )
 
     # Настраиваем макет: каждая привычка на новой строке (1 колонка)
@@ -62,7 +62,7 @@ def get_habits_list_keyboard(
             )
         )
 
-    # Кнопка "Вперед", если есть данные дальше
+    # Кнопка "Вперед", если есть следующая страница
     if has_next:
         nav_buttons.append(
             InlineKeyboardButton(
@@ -78,12 +78,15 @@ def get_habits_list_keyboard(
     return builder.as_markup()
 
 
-def get_habit_details_keyboard(habit_id: int, is_done_today: bool = False) -> InlineKeyboardMarkup:
+def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = False) -> InlineKeyboardMarkup:
     """
-    Генерирует клавиатуру управления конкретной привычкой.
+    Генерирует клавиатуру для детального просмотра привычки.
+
+    Включает кнопки действий (выполнить, удалить) и навигации (назад).
 
     Args:
         habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
         is_done_today (bool): Выполнена ли привычка сегодня.
                               Влияет на отображение кнопки выполнения.
 
@@ -97,27 +100,27 @@ def get_habit_details_keyboard(habit_id: int, is_done_today: bool = False) -> In
     if not is_done_today:
         builder.button(
             text="✅ Выполнить сегодня",
-            callback_data=HabitActionCallback(id=habit_id, action="done")
+            callback_data=HabitActionCallback(habit_id=habit_id, action="done")
         )
     else:
         builder.button(
             text="🏆 Уже выполнено!",
-            callback_data="noop"  # No Operation
+            callback_data="noop"  # no operation
         )
 
     # Кнопка удаления
     builder.button(
         text="🗑 Удалить",
-        callback_data=HabitActionCallback(id=habit_id, action="delete")
+        callback_data=HabitActionCallback(habit_id=habit_id, action="delete")
     )
 
-    # Кнопка возврата к списку (всегда на первую страницу для простоты)
+    # Кнопка возврата к списку
     builder.button(
-        text="🔙 К списку",
-        callback_data=HabitsNavigationCallback(page=0).pack()
+        text="🔙 Назад к списку",
+        callback_data=HabitsNavigationCallback(page=page).pack()
     )
 
-    # Расположение: [Выполнить] (новая строка) [Удалить] (новая строка) [Назад]
+    # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
     builder.adjust(1)
 
     return builder.as_markup()
