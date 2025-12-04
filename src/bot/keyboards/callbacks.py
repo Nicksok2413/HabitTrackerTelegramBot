@@ -26,7 +26,7 @@ class HabitDetailCallback(CallbackData, prefix="habit_detail"):
     Данные для просмотра конкретной привычки.
 
     Attributes:
-        habit_id (int): ID привычки для просмотра.
+        habit_id (int): ID привычки.
         page (int): Номер страницы списка, с которой перешли (для кнопки "Назад").
     """
     habit_id: int
@@ -38,17 +38,13 @@ class HabitActionCallback(CallbackData, prefix="habit_action"):
     Данные, связанные с действиями над конкретной привычкой.
 
     Attributes:
-        id (int): ID привычки.
+        habit_id (int): ID привычки.
         action (str): Тип действия.
             Возможные значения:
             - "view": Просмотр деталей привычки.
             - "done": Отметка выполнения.
             - "delete": Удаление привычки.
             - "confirm_delete": Подтверждение удаления.
-        page (int): Номер страницы для возврата.
     """
-    id: int
+    habit_id: int
     action: str
-    page: str
-
-
