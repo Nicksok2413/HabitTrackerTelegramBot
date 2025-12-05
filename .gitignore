@@ -86,9 +86,7 @@ docker-compose.local.yml
 #redis_data/
 
 # === Project Specific ===
-# Временные директории для тестов
-/temp_media/
-/temp_logs/
+logs/
 
 # === Others ===
 /node_modules/
