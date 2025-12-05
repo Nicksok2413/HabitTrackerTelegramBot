@@ -42,13 +42,13 @@ class HabitTrackerClient:
         self.shared_key = settings.API_BOT_SHARED_KEY
 
         # Создаем клиента httpx
-        # Используем один клиент на время жизни бота для connection pooling (как синглтон в рамках приложения бота)
+        # Используем один клиент на время жизни бота для connection pooling
         self.http_client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=10.0,  # Таймаут 10 секунд на запрос
         )
 
-    async def close(self):
+    async def close(self) -> None:
         """Корректно закрывает сессию HTTP-клиента."""
         await self.http_client.aclose()
 

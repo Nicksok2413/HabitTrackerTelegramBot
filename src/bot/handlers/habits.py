@@ -5,7 +5,7 @@
 - FSM для создания новой привычки: название -> описание -> цель -> время напоминания -> Сохранение в API.
 - Просмотр списка привычек (Pagination).
 - Просмотр деталей привычки.
-- Отметку выполнения привычки.
+- Отметку выполнения/отмены выполнения привычки.
 - Удаление привычки.
 """
 
@@ -34,12 +34,12 @@ log = setup_logger("BotHabitHandlers")
 # Создаем роутер
 router = Router(name="habit_handlers")
 
-# Константа размера страницы
+# Константа размера страницы для списка привычек
 PAGE_SIZE = 5
 
 
 # ==============================================================================
-# Просмотр списка привычек
+# Просмотр списка привычек (List View)
 # ==============================================================================
 
 
@@ -52,13 +52,15 @@ async def _render_habits_page(
     """
     Универсальная функция для отображения страницы списка привычек.
 
-    Используется как при первом вызове (сообщение), так и при пагинации (редактирование).
+    Используется как при первом вызове (отправка сообщения), так и при пагинации (редактирование).
 
     Args:
-        message_or_callback (Message | CallbackQuery): Объект Message или CallbackQuery.
+        message_or_callback (Message | CallbackQuery): Объект входящего события (Message или CallbackQuery).
         api_client (HabitTrackerClient): Клиент API.
         page (int): Номер страницы.
-        is_edit (bool): Если True, редактируем старое сообщение. Иначе отправляем новое.
+        is_edit (bool): Флаг режима редактирования.
+                        Если True - редактируем существующее сообщение (для пагинации).
+                        Если False - отправляем новое сообщение.
     """
     # Запрашиваем на 1 элемент больше, чтобы узнать, есть ли следующая страница
     limit = PAGE_SIZE + 1
@@ -86,6 +88,7 @@ async def _render_habits_page(
 
     # Определяем, есть ли следующая страница
     has_next = len(habits) > PAGE_SIZE
+
     # Отрезаем лишний элемент, чтобы список был равен размеру страницы (PAGE_SIZE)
     habits_to_show = habits[:PAGE_SIZE]
 
@@ -112,7 +115,8 @@ async def _render_habits_page(
 async def show_my_habits(message: Message, api_client: HabitTrackerClient) -> None:
     """
     Обработчик кнопки главного меню "📋 Мои привычки".
-    Отправляет первую страницу списка.
+
+    Отправляет первую страницу списка привычек.
 
     Args:
         message (Message): Объект сообщения Telegram.
@@ -135,11 +139,11 @@ async def navigate_habits_list(
     Обработчик кнопок пагинации (Назад/Вперед) и кнопки "Назад к списку".
 
     Args:
-        callback (CallbackQuery): ...
-        callback_data (HabitsNavigationCallback): ...
+        callback (CallbackQuery): Объект колбэка от нажатия кнопки навигации.
+        callback_data (HabitsNavigationCallback): Данные кнопки, содержащие номер целевой страницы.
         api_client (HabitTrackerClient): Клиент API.
     """
-    # Всегда отвечаем на callback, чтобы убрать часики загрузки
+    # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
     await callback.answer()
 
     if not callback.message:
@@ -155,7 +159,7 @@ async def navigate_habits_list(
 
 
 # ==============================================================================
-# Детали привычки и действия
+# Детали привычки и действия (Detail View & Actions)
 # ==============================================================================
 
 def _is_done_today(habit_details: dict) -> bool:
@@ -166,7 +170,7 @@ def _is_done_today(habit_details: dict) -> bool:
         habit_details: Словарь с данными привычки, включая ключ 'executions'.
 
     Returns:
-        bool: True - если у привычки есть запись выполнения за сегодня со статусом 'done'. False - если нет.
+        bool: True - если привычка выполнена сегодня, иначе False.
     """
     today_str = date.today().isoformat()  # 'YYYY-MM-DD'
 
@@ -192,16 +196,15 @@ async def _render_habit_details(
     Загружает детали привычки и обновляет сообщение с информацией.
 
     Args:
-        callback (CallbackQuery): ...
+        callback (CallbackQuery): Объект колбэка.
         habit_id (int): ID привычки.
         page (int): Номер страницы.
         api_client (HabitTrackerClient): Клиент API.
 
     """
-    # Всегда отвечаем на callback, чтобы убрать часики загрузки
+    # Пытаемся ответить на колбэк, если это возможно
     # Если callback пришел не от кнопки, а был вызван вручную из кода (например, после отмены удаления),
     # у него может не быть метода answer
-    # Проверяем
     try:
         await callback.answer()
     except Exception:
@@ -242,8 +245,7 @@ async def _render_habit_details(
             is_done_today=is_done  # Передаем статус для выбора кнопок
         )
 
-        # Обновляем сообщение
-        # Игнорируем ошибку "Message is not modified"
+        # Обновляем сообщение (игнорируем ошибку "Message is not modified", если текст не изменился)
         try:
             await callback.message.edit_text(text, reply_markup=keyboard)
         except TelegramBadRequest:
@@ -253,18 +255,40 @@ async def _render_habit_details(
         await callback.answer("Не удалось загрузить данные о привычке.", show_alert=True)
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "view"))
+@router.callback_query(HabitDetailCallback.filter())
 async def show_habit_details(
+        callback: CallbackQuery,
+        callback_data: HabitDetailCallback,
+        api_client: HabitTrackerClient
+) -> None:
+    """
+    Показывает детали выбранной привычки из списка.
+
+    Args:
+        callback (CallbackQuery): Объект колбэка от нажатия на привычку.
+        callback_data (HabitDetailCallback): Данные с ID привычки и номером страницы списка.
+        api_client (HabitTrackerClient): Клиент API.
+    """
+    await _render_habit_details(
+        callback=callback,
+        habit_id=callback_data.habit_id,
+        page=callback_data.page,
+        api_client=api_client
+    )
+
+
+@router.callback_query(HabitActionCallback.filter(F.action == "view"))  # type: ignore
+async def return_to_habit_details(
         callback: CallbackQuery,
         callback_data: HabitActionCallback,
         api_client: HabitTrackerClient
 ) -> None:
     """
-    Показывает детали выбранной привычки.
+    Обработчик для возврата к просмотру деталей привычки (например, при отмене удаления).
 
     Args:
-        callback (CallbackQuery): ...
-        callback_data (HabitActionCallback): ...
+        callback (CallbackQuery): Объект колбэка.
+        callback_data (HabitActionCallback): Данные с действием 'view'.
         api_client (HabitTrackerClient): Клиент API.
     """
     await _render_habit_details(
@@ -290,8 +314,8 @@ async def toggle_habit_status(
     После успеха обновляет интерфейс (карточку привычки), чтобы показать новый статус и стрик.
 
     Args:
-        callback (CallbackQuery): ...
-        callback_data (HabitActionCallback): ...
+        callback (CallbackQuery): Объект колбэка от нажатия кнопки действия.
+        callback_data (HabitActionCallback): Данные с ID привычки и типом действия.
         api_client (HabitTrackerClient): Клиент API.
     """
     # Определяем целевой статус для API
@@ -305,7 +329,7 @@ async def toggle_habit_status(
         text = "🎉 Супер! Привычка выполнена!" if target_status == "done" else "↩️ Выполнение отменено."
         await callback.answer(text)
 
-        # Перерисовываем карточку привычки, чтобы показать актуальный стрик
+        # Перерисовываем карточку привычки, чтобы показать актуальный статус и стрик
         await _render_habit_details(
             callback=callback,
             habit_id=callback_data.habit_id,
@@ -319,7 +343,7 @@ async def toggle_habit_status(
 
 # --- Логика удаления привычки ---
 
-@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))
+@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))  # type: ignore
 async def request_habit_delete(
         callback: CallbackQuery,
         callback_data: HabitActionCallback
@@ -328,10 +352,10 @@ async def request_habit_delete(
     Запрашивает подтверждение удаления привычки.
 
     Args:
-        callback (CallbackQuery): ...
-        callback_data (HabitActionCallback): ...
+        callback (CallbackQuery): Объект колбэка от кнопки 'Удалить'.
+        callback_data (HabitActionCallback): Данные с ID привычки.
     """
-    # Всегда отвечаем на callback, чтобы убрать часики загрузки
+    # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
     await callback.answer()
 
     if not callback.message:
@@ -349,7 +373,7 @@ async def request_habit_delete(
     )
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))
+@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))  # type: ignore
 async def confirm_habit_delete(
         callback: CallbackQuery,
         callback_data: HabitActionCallback,
@@ -358,11 +382,9 @@ async def confirm_habit_delete(
     """
     Выполняет удаление привычки после подтверждения.
 
-    Удаляет привычку и возвращает к списку.
-
     Args:
-        callback (CallbackQuery): ...
-        callback_data (HabitActionCallback): ...
+        callback (CallbackQuery): Объект колбэка от кнопки 'Да, удалить навсегда'.
+        callback_data (HabitActionCallback): Данные с ID привычки.
         api_client (HabitTrackerClient): Клиент API.
     """
 
