@@ -61,7 +61,7 @@ def create_app() -> FastAPI:
     Returns:
         FastAPI: Сконфигурированный экземпляр приложения.
     """
-    log.info(f"Создание экземпляра FastAPI для '{settings.PROJECT_NAME}@{settings.API_VERSION}'")
+    log.info(f"Создание экземпляра FastAPI для '{settings.PROJECT_NAME} {settings.API_VERSION}'")
     log.info(f"Режим разработки: {settings.DEVELOPMENT}, Режим продакшена: {settings.PRODUCTION}")
 
     app = FastAPI(

@@ -229,6 +229,9 @@ class HabitExecutionService(
             # Если статус меняется с DONE на PENDING (пользователь случайно нажал "Выполнил", а потом отменил),
             # уменьшаем стрик на 1, но не ниже 0
             if previous_execution_status == HabitExecutionStatus.DONE and habit.current_streak > 0:
+                if habit.max_streak == habit.current_streak:
+                    habit.max_streak -= 1
+
                 habit.current_streak -= 1
                 streaks_changed = True
                 log.debug(f"Стрик для привычки ID {habit.id} уменьшен (отмена выполнения).")

@@ -73,8 +73,7 @@ def get_database_url() -> str:
     if not all([db_user, db_password, db_host, db_port, db_name]):
         raise ValueError("Отсутствуют переменные окружения для базы данных (DB_USER, DB_PASSWORD, ...)")
 
-    # Кодируем учетные данные
-    # Это превращает 'p@ssword' в 'p%40ssword', что безопасно для строки подключения
+    # Экранируем пользователя и пароль, чтобы спецсимволы не ломали URL
     encoded_user = quote_plus(db_user)
     encoded_password = quote_plus(db_password)
 

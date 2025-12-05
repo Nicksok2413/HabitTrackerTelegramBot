@@ -40,56 +40,43 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --only main --no-root
 
 # =================================================================
-# Этап 2: "runner" - Финальный, чистый образ для запуска приложения
+# Этап 2: "runner" - Финальный, чистый образ для запуска бота
 # =================================================================
 # Используем легковесный образ Python
 FROM python:3.12-slim
 
 # Переменные окружения для Runtime
 # Добавляем .venv в PATH, чтобы команды python/uvicorn/alembic работали напрямую
+# Явно задаем HOME
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    HOME="/home/appuser" \
+    PYTHONPATH="/app"
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
 # Создаем группу с GID 1000 и непривилегированного пользователя с UID 1000
-# Для безопасности, чтобы не запускать приложение от root
-# Для решения проблемы с правами доступа к volumes (миграции) и кэшами
+# Для безопасности, чтобы не запускать бота от root
 RUN groupadd -g 1000 appgroup && \
     useradd -u 1000 -g appgroup -s /bin/sh -m appuser
-
-# Явно задаем HOME, чтобы инструменты (Ruff, Python) знали, где хранить кэш
-ENV HOME=/home/appuser
-
-# Устанавливаем только те системные пакеты, которые необходимы для работы приложения:
-# - libpq-dev: для работы драйвера psycopg
-# `rm -rf /var/lib/apt/lists/*` — удаляем списки пакетов для уменьшения размера образа
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq-dev && \
-    rm -rf /var/lib/apt/lists/*
 
 # Копируем скомпилированный `su-exec` и виртуальное окружение с зависимостями из этапа "builder"
 COPY --from=builder /usr/local/bin/su-exec /usr/local/bin/su-exec
 COPY --from=builder /app/.venv /app/.venv
 
 # Копируем entrypoint-скрипт и устанавливаем ему права на выполнение
-COPY ./docker/api/entrypoint.sh /entrypoint.sh
+COPY ./docker/bot/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Меняем владельца рабочей директории на appuser
 RUN chown appuser:appgroup /app
 
-# Копируем файлы, нужные для миграций и API, сразу устанавливая правильного владельца
-COPY --chown=appuser:appgroup ./migrations ./migrations
-COPY --chown=appuser:appgroup ./pyproject.toml ./pyproject.toml
-COPY --chown=appuser:appgroup ./src/api ./src/api
+# Копируем код и сразу устанавливая правильного владельца
+COPY --chown=appuser:appgroup ./src/bot ./src/bot
 COPY --chown=appuser:appgroup ./src/core_shared ./src/core_shared
-
-# Сообщаем Docker, что контейнер будет слушать порт 8000
-EXPOSE 8000
 
 # Устанавливаем скрипт как точку входа (он будет выполнен перед основной командой контейнера)
 ENTRYPOINT ["/entrypoint.sh"]
