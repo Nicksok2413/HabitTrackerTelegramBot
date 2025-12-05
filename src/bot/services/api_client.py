@@ -199,7 +199,7 @@ class HabitTrackerClient:
         Returns:
             dict[str, Any]: Словарь с данными привычки (с полем 'executions').
         """
-        return await self._request("GET", f"/habits/habits/{habit_id}/details", tg_user)
+        return await self._request("GET", f"/habits/{habit_id}/details", tg_user)
 
     async def create_habit(
         self,

@@ -15,7 +15,7 @@ from re import match
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User as TelegramUser
 
 from src.bot.keyboards.callbacks import HabitActionCallback, HabitsNavigationCallback, HabitDetailCallback
 from src.bot.keyboards.inline import (
@@ -45,17 +45,19 @@ PAGE_SIZE = 5
 
 async def _render_habits_page(
         message_or_callback: Message | CallbackQuery,
+        tg_user: TelegramUser,
         api_client: HabitTrackerClient,
         page: int,
         is_edit: bool = False
 ) -> None:
     """
-    Универсальная функция для отображения страницы списка привычек.
+    Вспомогательная функция для отображения страницы списка привычек.
 
     Используется как при первом вызове (отправка сообщения), так и при пагинации (редактирование).
 
     Args:
         message_or_callback (Message | CallbackQuery): Объект входящего события (Message или CallbackQuery).
+        tg_user (TelegramUser): Пользователь Telegram.
         api_client (HabitTrackerClient): Клиент API.
         page (int): Номер страницы.
         is_edit (bool): Флаг режима редактирования.
@@ -66,8 +68,8 @@ async def _render_habits_page(
     limit = PAGE_SIZE + 1
     skip = page * PAGE_SIZE
 
-    # Определяем объект User (зависит от типа входящего события)
-    tg_user = message_or_callback.from_user
+    # # Определяем объект User (зависит от типа входящего события)
+    # tg_user = message_or_callback.from_user
 
     try:
         habits = await api_client.get_my_habits(
@@ -123,7 +125,9 @@ async def show_my_habits(message: Message, api_client: HabitTrackerClient) -> No
         api_client (HabitTrackerClient): Клиент API.
     """
     await _render_habits_page(
-        message, api_client,
+        message_or_callback=message,
+        tg_user=message.from_user,
+        api_client=api_client,
         page=0,
         is_edit=False
     )
@@ -151,8 +155,9 @@ async def navigate_habits_list(
 
     # Редактируем текущее сообщение, показывая нужную страницу
     await _render_habits_page(
-        callback.message,
-        api_client,
+        message_or_callback=callback.message,
+        tg_user=callback.from_user,
+        api_client=api_client,
         page=callback_data.page,
         is_edit=True
     )
@@ -185,7 +190,6 @@ def _is_done_today(habit_details: dict) -> bool:
     return False
 
 
-@router.callback_query(HabitDetailCallback.filter())
 async def _render_habit_details(
         callback: CallbackQuery,
         habit_id: int,
@@ -193,6 +197,8 @@ async def _render_habit_details(
         api_client: HabitTrackerClient,
 ) -> None:
     """
+    Вспомогательная функция для отрисовки карточки детализации привычки.
+
     Загружает детали привычки и обновляет сообщение с информацией.
 
     Args:
@@ -397,6 +403,7 @@ async def confirm_habit_delete(
         # Возвращаемся к списку (на страницу, с которой перешли)
         await _render_habits_page(
             message_or_callback=callback,
+            tg_user=callback.from_user,
             api_client=api_client,
             page=callback_data.page,
             is_edit=True
@@ -591,6 +598,10 @@ async def process_habit_time(
         return
 
     time_to_remind_str = message.text.strip()
+
+    # Если пользователь ввел Ч:ММ, дополним до ЧЧ:ММ
+    if len(time_to_remind_str) == 4 and time_to_remind_str[1] == ":":
+        time_to_remind_str = "0" + time_to_remind_str
 
     # Валидация формата времени через регулярное выражение
     # ^([0-1]?[0-9]|2[0-3]) - часы от 00 до 23
