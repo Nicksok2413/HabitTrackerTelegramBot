@@ -232,16 +232,16 @@ class HabitTrackerClient:
         }
         return await self._request("POST", "/habits/", tg_user, json=payload)
 
-    async def execute_habit(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
+    async def change_habit_status(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
         """
-        Фиксирует выполнение привычки на сегодняшний день.
+        Фиксирует выполнение или отмену выполнения привычки на сегодняшний день.
 
         Использует эндпоинт POST /habits/{id}/executions/.
 
         Args:
             tg_user (TelegramUser): Пользователь Telegram.
             habit_id (int): ID привычки.
-            status (str): Статус выполнения ("done", "not_done"). По умолчанию "done".
+            status (str): Статус выполнения/отмены выполнения ("done", "pending"). По умолчанию "done".
 
         Returns:
             dict[str, Any]: Словарь с данными объекта созданного выполнения.
