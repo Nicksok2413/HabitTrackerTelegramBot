@@ -81,18 +81,12 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
 
     # Если состояния нет, выводим информативное сообщение и клавиатуру главного меню
     if current_state is None:
-        await message.answer(
-            "Нет активных действий для отмены.",
-            reply_markup=get_main_menu_keyboard()
-        )
+        await message.answer("Нет активных действий для отмены.", reply_markup=get_main_menu_keyboard())
         return
 
     # Сбрасываем состояние и очищаем данные формы
     await state.clear()
-    
+
     log.info(f"Пользователь {message.from_user.id} отменил действие (было состояние: {current_state}).")
-    
-    await message.answer(
-        "❌ Действие отменено.\nВозвращаюсь в главное меню.",
-        reply_markup=get_main_menu_keyboard()
-    )
+
+    await message.answer("❌ Действие отменено.\nВозвращаюсь в главное меню.", reply_markup=get_main_menu_keyboard())

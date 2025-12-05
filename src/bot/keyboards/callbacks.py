@@ -18,6 +18,7 @@ class HabitsNavigationCallback(CallbackData, prefix="habits_list"):
     Attributes:
         page (int): Номер страницы, которую нужно открыть (начиная с 0).
     """
+
     page: int
 
 
@@ -29,6 +30,7 @@ class HabitDetailCallback(CallbackData, prefix="habit_detail"):
         habit_id (int): ID привычки.
         page (int): Номер страницы списка, с которой перешли (для кнопки "Назад").
     """
+
     habit_id: int
     page: int
 
@@ -48,6 +50,7 @@ class HabitActionCallback(CallbackData, prefix="habit_action"):
             - "request_delete": Запрос на удаление привычки.
             - "confirm_delete": Подтверждение удаления привычки.
     """
+
     habit_id: int
     page: int
     action: str

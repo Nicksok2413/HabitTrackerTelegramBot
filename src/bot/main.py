@@ -49,7 +49,6 @@ async def main():
     dp.include_router(habits.router)
     dp.include_router(common.router)
 
-
     try:
         # Удаляем вебхук и очищаем очередь обновлений, накопившихся пока бот спал
         await bot.delete_webhook(drop_pending_updates=True)

@@ -108,7 +108,7 @@ class Database:
         try:
             yield session
         except Exception:
-            log.error(f"Ошибка во время сессии БД, выполняется откат.", exc_info=True)
+            log.error("Ошибка во время сессии БД, выполняется откат.", exc_info=True)
             await session.rollback()
             raise
         finally:

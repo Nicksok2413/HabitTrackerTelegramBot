@@ -10,18 +10,10 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.bot.keyboards.callbacks import (
-    HabitDetailCallback,
-    HabitsNavigationCallback,
-    HabitActionCallback
-)
+from src.bot.keyboards.callbacks import HabitDetailCallback, HabitsNavigationCallback, HabitActionCallback
 
 
-def get_habits_list_keyboard(
-        habits: list[dict[str, Any]],
-        page: int,
-        has_next: bool
-) -> InlineKeyboardMarkup:
+def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: bool) -> InlineKeyboardMarkup:
     """
     Генерирует клавиатуру со списком привычек и кнопками навигации.
 
@@ -42,10 +34,7 @@ def get_habits_list_keyboard(
         button_text = f"{status_icon} {habit['name']}"
 
         # При нажатии передаем ID и действие 'view'
-        builder.button(
-            text=button_text,
-            callback_data=HabitDetailCallback(habit_id=habit["id"], page=page)
-        )
+        builder.button(text=button_text, callback_data=HabitDetailCallback(habit_id=habit["id"], page=page))
 
     # Настраиваем макет: каждая привычка на новой строке (1 колонка)
     builder.adjust(1)
@@ -56,24 +45,16 @@ def get_habits_list_keyboard(
     # Кнопка "Назад", если это не первая страница
     if page > 0:
         nav_buttons.append(
-            InlineKeyboardButton(
-                text="⬅️ Назад",
-                callback_data=HabitsNavigationCallback(page=page - 1).pack()
-            )
+            InlineKeyboardButton(text="⬅️ Назад", callback_data=HabitsNavigationCallback(page=page - 1).pack())
         )
 
     # Индикатор страницы (неактивная кнопка)
-    nav_buttons.append(
-        InlineKeyboardButton(text=f"📄 {page + 1}", callback_data="noop")
-    )
+    nav_buttons.append(InlineKeyboardButton(text=f"📄 {page + 1}", callback_data="noop"))
 
     # Кнопка "Вперед", если есть следующая страница
     if has_next:
         nav_buttons.append(
-            InlineKeyboardButton(
-                text="Вперед ➡️",
-                callback_data=HabitsNavigationCallback(page=page + 1).pack()
-            )
+            InlineKeyboardButton(text="Вперед ➡️", callback_data=HabitsNavigationCallback(page=page + 1).pack())
         )
 
     # Добавляем ряд навигации в билдер, если кнопки есть
@@ -103,27 +84,22 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     # Кнопка выполнения
     if not is_done_today:
         builder.button(
-            text="✅ Выполнить сегодня",
-            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="done")
+            text="✅ Выполнить сегодня", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="done")
         )
     # Кнопка отмены выполнения
     else:
         builder.button(
             text="↩️ Отменить выполнение",
-            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="set_pending")
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="set_pending"),
         )
 
     # Кнопка удаления
     builder.button(
-        text="🗑 Удалить",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="request_delete")
+        text="🗑 Удалить", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="request_delete")
     )
 
     # Кнопка возврата к списку
-    builder.button(
-        text="🔙 Назад к списку",
-        callback_data=HabitsNavigationCallback(page=page).pack()
-    )
+    builder.button(text="🔙 Назад к списку", callback_data=HabitsNavigationCallback(page=page).pack())
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
     builder.adjust(1)
@@ -147,14 +123,14 @@ def get_habit_delete_confirmation_keyboard(habit_id: int, page: int) -> InlineKe
     # Кнопка подтверждения удаления
     builder.button(
         text="🔥 Да, удалить навсегда",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="confirm_delete")
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="confirm_delete"),
     )
 
     # Кнопка отмены удаления
     builder.button(
         text="❌ Нет, отмена",
         # Возвращаем пользователя к просмотру привычки ("view"), а не к списку
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="view")
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="view"),
     )
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)

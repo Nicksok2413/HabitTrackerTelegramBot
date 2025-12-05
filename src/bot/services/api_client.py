@@ -151,14 +151,13 @@ class HabitTrackerClient:
             raise
         except httpx.HTTPStatusError as exc:
             log.warning(f"API вернул ошибку {exc.response.status_code} на {method} {endpoint}: {exc.response.text}")
-            # Здесь можно добавить разбор ошибок валидации API, если нужно (например 404 или 400)
-            raise APIClientError(f"Ошибка запроса к API: {exc.response.status_code}")
+            raise APIClientError(f"Ошибка запроса к API: {exc.response.status_code}") from exc
         except httpx.RequestError as exc:
             log.error(f"Ошибка сети на {method} {endpoint}: {exc}")
-            raise APIClientError("Ошибка сети при обращении к API.")
+            raise APIClientError("Ошибка сети при обращении к API.") from exc
         except Exception as exc:
             log.error(f"Непредвиденная ошибка API клиента: {exc}", exc_info=True)
-            raise APIClientError("Неизвестная ошибка клиента API.")
+            raise APIClientError("Неизвестная ошибка клиента API.") from exc
 
     # --- Публичные методы API (Бизнес-логика) ---
 
