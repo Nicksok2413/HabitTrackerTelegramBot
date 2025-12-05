@@ -116,7 +116,7 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     # Кнопка удаления
     builder.button(
         text="🗑 Удалить",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="delete")
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="request_delete")
     )
 
     # Кнопка возврата к списку
