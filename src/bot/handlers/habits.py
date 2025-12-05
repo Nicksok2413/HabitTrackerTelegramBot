@@ -9,6 +9,7 @@
 - Удаление привычки.
 """
 
+from contextlib import suppress
 from datetime import date
 from re import match
 
@@ -17,6 +18,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User as TelegramUser
 
+from src.core_shared.logging_setup import setup_logger
 from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
 from src.bot.keyboards.inline import (
     get_habit_delete_confirmation_keyboard,
@@ -26,7 +28,6 @@ from src.bot.keyboards.inline import (
 from src.bot.keyboards.reply import BTN_CREATE_HABIT, BTN_MY_HABITS, get_main_menu_keyboard
 from src.bot.services.api_client import APIClientError, HabitTrackerClient
 from src.bot.states.habit_states import HabitCreation
-from src.core_shared.logging_setup import setup_logger
 
 # Настраиваем логгер
 log = setup_logger("BotHabitHandlers")
@@ -81,7 +82,8 @@ async def _render_habits_page(
         text = "Не удалось загрузить список привычек."
 
         if is_edit and isinstance(message_or_callback, CallbackQuery):
-            await message_or_callback.answer(text, show_alert=True)
+            with suppress(Exception):
+                await message_or_callback.answer(text, show_alert=True)
         else:
             if isinstance(message_or_callback, Message):
                 await message_or_callback.answer(text)
@@ -202,13 +204,11 @@ async def _render_habit_details(
         api_client (HabitTrackerClient): Клиент API.
 
     """
-    # Пытаемся ответить на колбэк, если это возможно
-    # Если callback пришел не от кнопки, а был вызван вручную из кода (например, после отмены удаления),
-    # у него может не быть метода answer
-    try:
+    # Пытаемся ответить на колбэк, чтобы убрать часики загрузки у кнопки
+    # Используем suppress, так как если callback устарел или был вызван вручную,
+    # метод answer может упасть, но это не должно прерывать логику отображения
+    with suppress(Exception):
         await callback.answer()
-    except Exception:
-        pass
 
     if not callback.message:
         return
@@ -242,14 +242,20 @@ async def _render_habit_details(
             is_done_today=is_done,  # Передаем статус для выбора кнопок
         )
 
-        # Обновляем сообщение (игнорируем ошибку "Message is not modified", если текст не изменился)
+        # Обновляем сообщение
         try:
             await callback.message.edit_text(text, reply_markup=keyboard)
-        except TelegramBadRequest:
-            pass
+        except TelegramBadRequest as exc:
+            # Игнорируем ошибку "Message is not modified", если текст не изменился
+            # Все остальные ошибки (например, невалидный HTML) - пробрасываем
+            if "message is not modified" not in str(exc).lower():
+                raise exc
 
     except APIClientError:
-        await callback.answer("Не удалось загрузить данные о привычке.", show_alert=True)
+        # В случае ошибки API показываем всплывающее уведомление
+        # Используем suppress на случай, если callback.answer уже был вызван выше
+        with suppress(Exception):
+            await callback.answer("Не удалось загрузить данные о привычке.", show_alert=True)
 
 
 @router.callback_query(HabitDetailCallback.filter())
@@ -325,7 +331,8 @@ async def toggle_habit_status(
         )
 
     except APIClientError:
-        await callback.answer("Ошибка при обновлении статуса привычки.", show_alert=True)
+        with suppress(Exception):
+            await callback.answer("Ошибка при обновлении статуса привычки.", show_alert=True)
 
 
 # --- Логика удаления привычки ---
@@ -384,7 +391,8 @@ async def confirm_habit_delete(
         )
 
     except APIClientError:
-        await callback.answer("Не удалось удалить привычку. Попробуйте позже.", show_alert=True)
+        with suppress(Exception):
+            await callback.answer("Не удалось удалить привычку. Попробуйте позже.", show_alert=True)
         # Если ошибка, возвращаем пользователя к просмотру привычки
         await _render_habit_details(
             callback=callback, habit_id=callback_data.habit_id, page=callback_data.page, api_client=api_client

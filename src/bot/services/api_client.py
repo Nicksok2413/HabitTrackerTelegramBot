@@ -92,13 +92,13 @@ class HabitTrackerClient:
 
         except httpx.HTTPStatusError as exc:
             log.error(f"API вернул ошибку при получении токена: {exc.response.status_code} - {exc.response.text}")
-            raise APIClientError(f"Ошибка авторизации в API: {exc.response.status_code}")
+            raise APIClientError(f"Ошибка авторизации в API: {exc.response.status_code}") from exc
         except httpx.RequestError as exc:
             log.error(f"Сетевая ошибка при запросе токена: {exc}")
-            raise APIClientError("API недоступен (сетевая ошибка).")
+            raise APIClientError("API недоступен (сетевая ошибка).") from exc
         except Exception as exc:
             log.error(f"Непредвиденная ошибка в _get_user_token: {exc}", exc_info=True)
-            raise APIClientError("Внутренняя ошибка клиента.")
+            raise APIClientError("Внутренняя ошибка клиента.") from exc
 
     async def _request(
         self,

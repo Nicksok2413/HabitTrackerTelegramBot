@@ -10,7 +10,7 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.bot.keyboards.callbacks import HabitDetailCallback, HabitsNavigationCallback, HabitActionCallback
+from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
 
 
 def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: bool) -> InlineKeyboardMarkup:
