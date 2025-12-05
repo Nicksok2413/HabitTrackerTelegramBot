@@ -62,6 +62,11 @@ def get_habits_list_keyboard(
             )
         )
 
+    # Индикатор страницы (неактивная кнопка)
+    nav_buttons.append(
+        InlineKeyboardButton(text=f"📄 {page + 1}", callback_data="noop")
+    )
+
     # Кнопка "Вперед", если есть следующая страница
     if has_next:
         nav_buttons.append(
@@ -82,7 +87,7 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     """
     Генерирует клавиатуру для детального просмотра привычки.
 
-    Включает кнопки действий (выполнить, удалить) и навигации (назад).
+    Включает кнопки действий (выполнить, отменить выполнение, удалить) и навигации (назад).
 
     Args:
         habit_id (int): ID привычки.
@@ -96,28 +101,60 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     builder = InlineKeyboardBuilder()
 
     # Кнопка выполнения
-    # Если уже выполнено, показываем просто информативную кнопку "Уже выполнено".
     if not is_done_today:
         builder.button(
             text="✅ Выполнить сегодня",
-            callback_data=HabitActionCallback(habit_id=habit_id, action="done")
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="done")
         )
+    # Кнопка отмены выполнения
     else:
         builder.button(
-            text="🏆 Уже выполнено!",
-            callback_data="noop"  # no operation
+            text="↩️ Отменить выполнение",
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="set_pending")
         )
 
     # Кнопка удаления
     builder.button(
         text="🗑 Удалить",
-        callback_data=HabitActionCallback(habit_id=habit_id, action="delete")
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="delete")
     )
 
     # Кнопка возврата к списку
     builder.button(
         text="🔙 Назад к списку",
         callback_data=HabitsNavigationCallback(page=page).pack()
+    )
+
+    # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+def get_habit_delete_confirmation_keyboard(habit_id: int, page: int) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру подтверждения удаления.
+
+    Args:
+        habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Кнопка подтверждения удаления
+    builder.button(
+        text="🔥 Да, удалить навсегда",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="confirm_delete")
+    )
+
+    # Кнопка отмены удаления
+    builder.button(
+        text="❌ Нет, отмена",
+        # Возвращаем пользователя к просмотру привычки ("view"), а не к списку
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="view")
     )
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
