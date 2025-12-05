@@ -13,11 +13,16 @@ from datetime import date
 from re import match
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from src.bot.keyboards.callbacks import HabitActionCallback, HabitsNavigationCallback, HabitDetailCallback
-from src.bot.keyboards.inline import get_habit_detail_keyboard, get_habits_list_keyboard
+from src.bot.keyboards.inline import (
+    get_habit_detail_keyboard,
+    get_habits_list_keyboard,
+    get_habit_delete_confirmation_keyboard,
+)
 from src.bot.keyboards.reply import BTN_CREATE_HABIT, BTN_MY_HABITS, get_main_menu_keyboard
 from src.bot.services.api_client import APIClientError, HabitTrackerClient
 from src.bot.states.habit_states import HabitCreation
@@ -113,7 +118,11 @@ async def show_my_habits(message: Message, api_client: HabitTrackerClient) -> No
         message (Message): Объект сообщения Telegram.
         api_client (HabitTrackerClient): Клиент API.
     """
-    await _render_habits_page(message, api_client, page=0, is_edit=False)
+    await _render_habits_page(
+        message, api_client,
+        page=0,
+        is_edit=False
+    )
 
 
 @router.callback_query(HabitsNavigationCallback.filter())
@@ -137,11 +146,16 @@ async def navigate_habits_list(
         return
 
     # Редактируем текущее сообщение, показывая нужную страницу
-    await _render_habits_page(callback.message, api_client, page=callback_data.page, is_edit=True)
+    await _render_habits_page(
+        callback.message,
+        api_client,
+        page=callback_data.page,
+        is_edit=True
+    )
 
 
 # ==============================================================================
-# Детали привычки и Действия
+# Детали привычки и действия
 # ==============================================================================
 
 def _is_done_today(habit_details: dict) -> bool:
@@ -169,23 +183,29 @@ def _is_done_today(habit_details: dict) -> bool:
 
 @router.callback_query(HabitDetailCallback.filter())
 async def _render_habit_details(
-        api_client: HabitTrackerClient,
         callback: CallbackQuery,
         habit_id: int,
         page: int,
+        api_client: HabitTrackerClient,
 ) -> None:
     """
     Загружает детали привычки и обновляет сообщение с информацией.
 
     Args:
-        api_client (HabitTrackerClient): Клиент API.
         callback (CallbackQuery): ...
         habit_id (int): ID привычки.
         page (int): Номер страницы.
+        api_client (HabitTrackerClient): Клиент API.
 
     """
     # Всегда отвечаем на callback, чтобы убрать часики загрузки
-    await callback.answer()
+    # Если callback пришел не от кнопки, а был вызван вручную из кода (например, после отмены удаления),
+    # у него может не быть метода answer
+    # Проверяем
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
     if not callback.message:
         return
@@ -215,14 +235,19 @@ async def _render_habit_details(
             f"{status_text}"
         )
 
-        # Клавиатура с кнопкой "Выполнить" и "Назад" (возвращает на ту же страницу списка)
+        # Клавиатура с кнопками действий (выполнить, отменить выполнение, удалить и назад)
         keyboard = get_habit_detail_keyboard(
             habit_id=habit["id"],
-            page=page
+            page=page,
+            is_done_today=is_done  # Передаем статус для выбора кнопок
         )
 
         # Обновляем сообщение
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        # Игнорируем ошибку "Message is not modified"
+        try:
+            await callback.message.edit_text(text, reply_markup=keyboard)
+        except TelegramBadRequest:
+            pass
 
     except APIClientError:
         await callback.answer("Не удалось загрузить данные о привычке.", show_alert=True)
@@ -243,21 +268,24 @@ async def show_habit_details(
         api_client (HabitTrackerClient): Клиент API.
     """
     await _render_habit_details(
-        api_client,
-        callback,
+        callback=callback,
         habit_id=callback_data.habit_id,
-        page=callback_data.page
+        page=callback_data.page,
+        api_client=api_client
     )
 
+# --- Логика выполнения / отмены выполнения привычки ---
 
-@router.callback_query(HabitActionCallback.filter(F.action == "done"))
-async def mark_habit_done(
+@router.callback_query(HabitActionCallback.filter(F.action.in_({"done", "set_pending"})))
+async def toggle_habit_status(
         callback: CallbackQuery,
         callback_data: HabitActionCallback,
         api_client: HabitTrackerClient
 ) -> None:
     """
-    Отмечает привычку выполненной.
+    Переключает статус привычки:
+    - done: Выполнить
+    - set_pending: Отменить выполнение (вернуть в pending)
 
     После успеха обновляет интерфейс (карточку привычки), чтобы показать новый статус и стрик.
 
@@ -266,32 +294,70 @@ async def mark_habit_done(
         callback_data (HabitActionCallback): ...
         api_client (HabitTrackerClient): Клиент API.
     """
+    # Определяем целевой статус для API
+    target_status = "done" if callback_data.action == "done" else "pending"
+
     try:
         # Отправляем запрос в API
-        await api_client.execute_habit(callback.from_user, callback_data.habit_id, status="done")
+        await api_client.change_habit_status(callback.from_user, callback_data.habit_id, status=target_status)
 
-        # Показываем всплывающее уведомление
-        await callback.answer("🎉 Супер! Привычка выполнена!", show_alert=True)
+        # Показываем уведомление
+        text = "🎉 Супер! Привычка выполнена!" if target_status == "done" else "↩️ Выполнение отменено."
+        await callback.answer(text)
 
         # Перерисовываем карточку привычки, чтобы показать актуальный стрик
         await _render_habit_details(
-            api_client,
-            callback,
+            callback=callback,
             habit_id=callback_data.habit_id,
-            page=callback_data.page
+            page=callback_data.page,
+            api_client=api_client,
         )
 
     except APIClientError:
-        await callback.answer("Ошибка при сохранении выполнения.", show_alert=True)
+        await callback.answer("Ошибка при обновлении статуса привычки.", show_alert=True)
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "delete"))
-async def delete_habit(
+# --- Логика удаления привычки ---
+
+@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))
+async def request_habit_delete(
+        callback: CallbackQuery,
+        callback_data: HabitActionCallback
+) -> None:
+    """
+    Запрашивает подтверждение удаления привычки.
+
+    Args:
+        callback (CallbackQuery): ...
+        callback_data (HabitActionCallback): ...
+    """
+    # Всегда отвечаем на callback, чтобы убрать часики загрузки
+    await callback.answer()
+
+    if not callback.message:
+        return
+
+    keyboard = get_habit_delete_confirmation_keyboard(
+        habit_id=callback_data.habit_id,
+        page=callback_data.page
+    )
+
+    await callback.message.edit_text(
+        "⚠️ <b>Вы действительно хотите удалить эту привычку?</b>\n\n"
+        "Это действие нельзя будет отменить. Вся история выполнений будет потеряна.",
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))
+async def confirm_habit_delete(
         callback: CallbackQuery,
         callback_data: HabitActionCallback,
         api_client: HabitTrackerClient
-):
+) -> None:
     """
+    Выполняет удаление привычки после подтверждения.
+
     Удаляет привычку и возвращает к списку.
 
     Args:
@@ -304,22 +370,29 @@ async def delete_habit(
         # Удаляем через API
         await api_client.delete_habit(callback.from_user, callback_data.habit_id)
 
-        await callback.answer("Привычка удалена.")
+        await callback.answer("✅ Привычка удалена.")
 
         # Возвращаемся к списку (на страницу, с которой перешли)
         await _render_habits_page(
-            callback,
-            api_client,
+            message_or_callback=callback,
+            api_client=api_client,
             page=callback_data.page,
             is_edit=True
         )
 
     except APIClientError:
-        await callback.answer("Не удалось удалить привычку.", show_alert=True)
+        await callback.answer("Не удалось удалить привычку. Попробуйте позже.", show_alert=True)
+        # Если ошибка, возвращаем пользователя к просмотру привычки
+        await _render_habit_details(
+            callback=callback,
+            habit_id=callback_data.habit_id,
+            page=callback_data.page,
+            api_client=api_client
+        )
 
 
 # ==============================================================================
-# Создание привычки
+# Создание привычки (FSM)
 # ==============================================================================
 
 # --- Начало (по нажатию кнопки) ---
