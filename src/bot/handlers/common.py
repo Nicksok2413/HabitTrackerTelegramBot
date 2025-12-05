@@ -75,6 +75,8 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
         message (Message): Объект сообщения Telegram.
         state (FSMContext): Контекст машины состояний.
     """
+    if not message.from_user:
+        return
 
     # Получаем текущее состояние
     current_state = await state.get_state()

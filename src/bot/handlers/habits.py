@@ -16,9 +16,9 @@ from re import match
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User as TelegramUser
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import User as TelegramUser
 
-from src.core_shared.logging_setup import setup_logger
 from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
 from src.bot.keyboards.inline import (
     get_habit_delete_confirmation_keyboard,
@@ -28,6 +28,7 @@ from src.bot.keyboards.inline import (
 from src.bot.keyboards.reply import BTN_CREATE_HABIT, BTN_MY_HABITS, get_main_menu_keyboard
 from src.bot.services.api_client import APIClientError, HabitTrackerClient
 from src.bot.states.habit_states import HabitCreation
+from src.core_shared.logging_setup import setup_logger
 
 # Настраиваем логгер
 log = setup_logger("BotHabitHandlers")
@@ -74,7 +75,7 @@ async def _render_habits_page(
 
     try:
         habits = await api_client.get_my_habits(
-            tg_user=tg_user,  # type: ignore
+            tg_user=tg_user,
             skip=skip,
             limit=limit,
         )
@@ -126,6 +127,9 @@ async def show_my_habits(message: Message, api_client: HabitTrackerClient) -> No
         message (Message): Объект сообщения Telegram.
         api_client (HabitTrackerClient): Клиент API.
     """
+    if not message.from_user:
+        return
+
     await _render_habits_page(
         message_or_callback=message, tg_user=message.from_user, api_client=api_client, page=0, is_edit=False
     )
@@ -146,7 +150,7 @@ async def navigate_habits_list(
     # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
     await callback.answer()
 
-    if not callback.message:
+    if not callback.message or not isinstance(callback.message, Message):
         return
 
     # Редактируем текущее сообщение, показывая нужную страницу
@@ -210,7 +214,7 @@ async def _render_habit_details(
     with suppress(Exception):
         await callback.answer()
 
-    if not callback.message:
+    if not callback.message or not isinstance(callback.message, Message):
         return
 
     try:
@@ -275,7 +279,7 @@ async def show_habit_details(
     )
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "view"))  # type: ignore
+@router.callback_query(HabitActionCallback.filter(F.action == "view"))
 async def return_to_habit_details(
     callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
 ) -> None:
@@ -338,7 +342,7 @@ async def toggle_habit_status(
 # --- Логика удаления привычки ---
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))  # type: ignore
+@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))
 async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActionCallback) -> None:
     """
     Запрашивает подтверждение удаления привычки.
@@ -350,7 +354,7 @@ async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActi
     # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
     await callback.answer()
 
-    if not callback.message:
+    if not callback.message or not isinstance(callback.message, Message):
         return
 
     keyboard = get_habit_delete_confirmation_keyboard(habit_id=callback_data.habit_id, page=callback_data.page)
@@ -362,7 +366,7 @@ async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActi
     )
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))  # type: ignore
+@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))
 async def confirm_habit_delete(
     callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
 ) -> None:
@@ -418,6 +422,9 @@ async def start_habit_creation(message: Message, state: FSMContext) -> None:
         message (Message): Объект сообщения Telegram.
         state (FSMContext): Контекст машины состояний.
     """
+    if not message.from_user:
+        return
+
     log.info(f"Пользователь {message.from_user.id} начал создание привычки.")
 
     await message.answer(
@@ -489,7 +496,7 @@ async def process_habit_description(message: Message, state: FSMContext) -> None
         await message.answer("⚠️ Пожалуйста, отправьте текст или нажмите /skip.")
         return
 
-    habit_description = message.text.strip()
+    habit_description: str | None = message.text.strip()
 
     # Логика пропуска шага (если команда /skip)
     if habit_description == "/skip":
@@ -572,6 +579,9 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
         state (FSMContext): Контекст машины состояний.
         api_client (HabitTrackerClient): Инъекция клиента API.
     """
+    if not message.from_user:
+        return
+
     if not message.text:
         await message.answer("⚠️ Введите время текстом в формате ЧЧ:ММ.")
         return
@@ -607,7 +617,7 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
     try:
         # Отправляем запрос к Backend API
         new_habit = await api_client.create_habit(
-            tg_user=message.from_user,  # type: ignore
+            tg_user=message.from_user,
             name=habit_name,
             description=habit_description,
             time_to_remind=time_to_remind_str,

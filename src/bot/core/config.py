@@ -5,7 +5,7 @@
 и вычисляемые свойства, необходимые для работы приложения.
 """
 
-from pydantic import Field, computed_field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Уровень логирования")
 
     # Формируем URL к API
-    @computed_field
+    @property
     def API_V1_URL(self) -> str:
         """
         Возвращает полный URL к API v1.

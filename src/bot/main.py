@@ -24,7 +24,7 @@ from src.core_shared.logging_setup import setup_logger
 log = setup_logger("BotMain", log_level_override=settings.LOG_LEVEL)
 
 
-async def main():
+async def main() -> None:
     """Асинхронная точка входа."""
     log.info("🚀 Запуск Telegram бота...")
 

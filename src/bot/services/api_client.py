@@ -5,7 +5,7 @@
 Бот использует этот клиент для всех операций с данными.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from aiogram.types import User as TelegramUser
@@ -36,7 +36,7 @@ class HabitTrackerClient:
     - Обработку сетевых ошибок.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Инициализирует клиент с базовым URL и настройками таймаута."""
         self.base_url = settings.API_V1_URL
         self.shared_key = settings.API_BOT_SHARED_KEY
@@ -88,7 +88,9 @@ class HabitTrackerClient:
 
             # Парсим JSON и забираем токен
             data = response.json()
-            return data["access_token"]
+
+            # Явная типизация для mypy
+            return cast(str, data["access_token"])
 
         except httpx.HTTPStatusError as exc:
             log.error(f"API вернул ошибку при получении токена: {exc.response.status_code} - {exc.response.text}")
@@ -183,7 +185,11 @@ class HabitTrackerClient:
             "limit": limit,
             "active_only": str(active_only).lower(),  # API ожидает 'true'/'false'
         }
-        return await self._request("GET", "/habits/", tg_user, params=params)
+
+        response = await self._request("GET", "/habits/", tg_user, params=params)
+
+        # Явная типизация для mypy
+        return cast(list[dict[str, Any]], response)
 
     async def get_habit_details(self, tg_user: TelegramUser, habit_id: int) -> dict[str, Any]:
         """
@@ -198,7 +204,11 @@ class HabitTrackerClient:
         Returns:
             dict[str, Any]: Словарь с данными привычки (с полем 'executions').
         """
-        return await self._request("GET", f"/habits/{habit_id}/details", tg_user)
+
+        response = await self._request("GET", f"/habits/{habit_id}/details", tg_user)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
 
     async def create_habit(
         self,
@@ -229,7 +239,11 @@ class HabitTrackerClient:
             "description": description,
             "target_days": target_days,
         }
-        return await self._request("POST", "/habits/", tg_user, json=payload)
+
+        response = await self._request("POST", "/habits/", tg_user, json=payload)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
 
     async def change_habit_status(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
         """
@@ -247,7 +261,10 @@ class HabitTrackerClient:
         """
         payload = {"status": status}
 
-        return await self._request("POST", f"/habits/{habit_id}/executions/", tg_user, json=payload)
+        response = await self._request("POST", f"/habits/{habit_id}/executions/", tg_user, json=payload)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
 
     async def delete_habit(self, tg_user: TelegramUser, habit_id: int) -> None:
         """
