@@ -43,9 +43,10 @@ class HabitActionCallback(CallbackData, prefix="habit_action"):
         action (str): Тип действия.
             Возможные значения:
             - "view": Просмотр деталей привычки.
-            - "done": Отметка выполнения.
-            - "delete": Удаление привычки.
-            - "confirm_delete": Подтверждение удаления.
+            - "done": Отметка 'Выполнить сегодня'.
+            - "set_pending": Отмена выполнения.
+            - "request_delete": Запрос на удаление привычки.
+            - "confirm_delete": Подтверждение удаления привычки.
     """
     habit_id: int
     page: int
