@@ -1,4 +1,3 @@
-# src/bot/handlers/profile.py
 """
 Обработчики раздела "Профиль".
 """
@@ -9,6 +8,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from src.bot.core.enums import ProfileAction
 from src.bot.keyboards.callbacks import ProfileActionCallback
 from src.bot.keyboards.inline import get_profile_keyboard
 from src.bot.keyboards.reply import BTN_PROFILE, get_main_menu_keyboard
@@ -63,7 +63,7 @@ async def show_profile(message: Message, api_client: HabitTrackerClient) -> None
         await message.answer("❌ Не удалось загрузить профиль. Попробуйте позже.")
 
 
-@router.callback_query(ProfileActionCallback.filter(F.action == "change_timezone"))
+@router.callback_query(ProfileActionCallback.filter(F.action == ProfileAction.CHANGE_TIMEZONE))
 async def start_timezone_change(callback: CallbackQuery, state: FSMContext) -> None:
     """
     Начало процесса смены часового пояса (нажатие на кнопку).

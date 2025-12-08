@@ -10,18 +10,20 @@
 
 from aiogram.filters.callback_data import CallbackData
 
+from src.bot.core.enums import HabitAction, ProfileAction
+
 
 class ProfileActionCallback(CallbackData, prefix="profile"):
     """
     Данные, связанные с действиями в профиле.
 
     Attributes:
-        action (str): Тип действия.
+        action (ProfileAction): Тип действия.
             Возможные значения:
-            - "change_timezone": Изменить часовой пояс.
+            - "change_tz": Изменить часовой пояс.
     """
 
-    action: str
+    action: ProfileAction
 
 
 class HabitsNavigationCallback(CallbackData, prefix="habits_list"):
@@ -55,15 +57,15 @@ class HabitActionCallback(CallbackData, prefix="habit_action"):
     Attributes:
         habit_id (int): ID привычки.
         page (int): Номер страницы списка, с которой перешли (для кнопки "Назад").
-        action (str): Тип действия.
+        action (HabitAction): Тип действия.
             Возможные значения:
             - "view": Просмотр деталей привычки.
             - "done": Отметка 'Выполнить сегодня'.
             - "set_pending": Отмена выполнения.
-            - "request_delete": Запрос на удаление привычки.
-            - "confirm_delete": Подтверждение удаления привычки.
+            - "req_del": Запрос на удаление привычки.
+            - "conf_del": Подтверждение удаления привычки.
     """
 
     habit_id: int
     page: int
-    action: str
+    action: HabitAction

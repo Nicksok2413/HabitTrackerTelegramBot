@@ -19,6 +19,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from aiogram.types import User as TelegramUser
 
+from src.bot.core.enums import HabitAction
 from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
 from src.bot.keyboards.inline import (
     get_habit_delete_confirmation_keyboard,
@@ -296,7 +297,7 @@ async def show_habit_details(
     )
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "view"))
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.VIEW))
 async def return_to_habit_details(
     callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
 ) -> None:
@@ -316,7 +317,7 @@ async def return_to_habit_details(
 # --- Логика выполнения / отмены выполнения привычки ---
 
 
-@router.callback_query(HabitActionCallback.filter(F.action.in_({"done", "set_pending"})))
+@router.callback_query(HabitActionCallback.filter(F.action.in_({HabitAction.DONE, HabitAction.SET_PENDING})))
 async def toggle_habit_status(
     callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
 ) -> None:
@@ -359,7 +360,7 @@ async def toggle_habit_status(
 # --- Логика удаления привычки ---
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "request_delete"))
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.REQUEST_DELETE))
 async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActionCallback) -> None:
     """
     Запрашивает подтверждение удаления привычки.
@@ -383,7 +384,7 @@ async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActi
     )
 
 
-@router.callback_query(HabitActionCallback.filter(F.action == "confirm_delete"))
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.CONFIRM_DELETE))
 async def confirm_habit_delete(
     callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
 ) -> None:

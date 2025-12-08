@@ -4,11 +4,12 @@
 Эти обработчики доступны из любого состояния и служат точками входа или выхода из сценариев.
 """
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
+from src.bot.core.enums import IGNORE_CALLBACK
 from src.bot.keyboards.reply import get_main_menu_keyboard
 from src.bot.services.api_client import APIClientError, HabitTrackerClient
 from src.core_shared.logging_setup import setup_logger
@@ -92,3 +93,13 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
     log.info(f"Пользователь {message.from_user.id} отменил действие (было состояние: {current_state}).")
 
     await message.answer("❌ Действие отменено.\nВозвращаюсь в главное меню.", reply_markup=get_main_menu_keyboard())
+
+
+@router.callback_query(F.data == IGNORE_CALLBACK)
+async def ignore_callback(callback: CallbackQuery) -> None:
+    """
+    Пустой хендлер для неактивных кнопок (например, индикатор первой страницы).
+
+    Просто убирает 'часики' загрузки.
+    """
+    await callback.answer()

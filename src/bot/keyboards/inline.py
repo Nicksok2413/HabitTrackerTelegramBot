@@ -10,6 +10,7 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from src.bot.core.enums import HabitAction, ProfileAction, IGNORE_CALLBACK
 from src.bot.keyboards.callbacks import (
     HabitActionCallback,
     HabitDetailCallback,
@@ -27,7 +28,10 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
     """
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="🌍 Изменить часовой пояс", callback_data=ProfileActionCallback(action="change_timezone"))
+    builder.button(
+        text="🌍 Изменить часовой пояс",
+        callback_data=ProfileActionCallback(action=ProfileAction.CHANGE_TIMEZONE),
+    )
 
     return builder.as_markup()
 
@@ -49,8 +53,11 @@ def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: 
     # Генерируем кнопки для каждой привычки
     for habit in habits:
         # Визуальная индикация: огонек, если есть стрик > 0
-        status_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
-        button_text = f"{status_icon} {habit['name']}"
+        streak_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
+        button_text = f"{streak_icon} {habit['name']}"
+
+        # status_icon = "✅" if habit.execution.get("status", "pending") == "done" else "⬜"
+        # button_text = f"{streak_icon} {habit['name']} {status_icon}"
 
         # При нажатии передаем ID и действие 'view'
         builder.button(text=button_text, callback_data=HabitDetailCallback(habit_id=habit["id"], page=page))
@@ -68,7 +75,7 @@ def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: 
         )
 
     # Индикатор страницы (неактивная кнопка)
-    nav_buttons.append(InlineKeyboardButton(text=f"📄 {page + 1}", callback_data="noop"))
+    nav_buttons.append(InlineKeyboardButton(text=f"📄 {page + 1}", callback_data=IGNORE_CALLBACK))
 
     # Кнопка "Вперед", если есть следующая страница
     if has_next:
@@ -103,18 +110,20 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     # Кнопка выполнения
     if not is_done_today:
         builder.button(
-            text="✅ Выполнить сегодня", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="done")
+            text="✅ Выполнить сегодня",
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.DONE),
         )
     # Кнопка отмены выполнения
     else:
         builder.button(
             text="↩️ Отменить выполнение",
-            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="set_pending"),
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.SET_PENDING),
         )
 
     # Кнопка удаления
     builder.button(
-        text="🗑 Удалить", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="request_delete")
+        text="🗑 Удалить",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.REQUEST_DELETE),
     )
 
     # Кнопка возврата к списку
@@ -142,14 +151,14 @@ def get_habit_delete_confirmation_keyboard(habit_id: int, page: int) -> InlineKe
     # Кнопка подтверждения удаления
     builder.button(
         text="🔥 Да, удалить навсегда",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="confirm_delete"),
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.CONFIRM_DELETE),
     )
 
     # Кнопка отмены удаления
     builder.button(
         text="❌ Нет, отмена",
         # Возвращаем пользователя к просмотру привычки ("view"), а не к списку
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action="view"),
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW),
     )
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
