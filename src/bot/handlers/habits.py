@@ -103,7 +103,7 @@ async def _render_habits_page(
             tg_user=tg_user,
             api_client=api_client,
             page=page - 1,
-            is_edit=is_edit
+            is_edit=is_edit,
         )
 
         return

@@ -3,7 +3,6 @@
 Обработчики раздела "Профиль".
 """
 
-from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
@@ -37,7 +36,7 @@ async def show_profile(message: Message, api_client: HabitTrackerClient) -> None
         return
 
     # Индикатор загрузки
-    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing") # type: ignore
+    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")  # type: ignore
 
     try:
         # Получаем данные пользователя из API
@@ -95,11 +94,7 @@ async def start_timezone_change(callback: CallbackQuery, state: FSMContext) -> N
 
 
 @router.message(ProfileEdit.waiting_for_timezone)
-async def process_timezone_input(
-    message: Message,
-    state: FSMContext,
-    api_client: HabitTrackerClient
-) -> None:
+async def process_timezone_input(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Обработка введенного текста часового пояса.
 
@@ -141,8 +136,7 @@ async def process_timezone_input(
         await processing_msg.delete()
 
         await message.answer(
-            f"✅ Часовой пояс успешно изменен на <b>{new_timezone}</b>.\n"
-            "Напоминания будут приходить вовремя!",
+            f"✅ Часовой пояс успешно изменен на <b>{new_timezone}</b>.\nНапоминания будут приходить вовремя!",
             reply_markup=get_main_menu_keyboard(),  # Возвращаем главное меню
         )
         log.info(f"Часовой пояс успешно изменен на {new_timezone} для пользователя {message.from_user.id}.")
@@ -152,8 +146,7 @@ async def process_timezone_input(
         log.error(f"Ошибка при обновлении профиля для {message.from_user.id}: {exc}")
 
         await message.answer(
-            "❌ Ошибка при обновлении профиля на сервере. Попробуйте позже.",
-            reply_markup=get_profile_keyboard()
+            "❌ Ошибка при обновлении профиля на сервере. Попробуйте позже.", reply_markup=get_profile_keyboard()
         )
     finally:
         # В любом случае (успех или ошибка) сбрасываем состояние FSM

@@ -27,10 +27,7 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
     """
     builder = InlineKeyboardBuilder()
 
-    builder.button(
-        text="🌍 Изменить часовой пояс",
-        callback_data=ProfileActionCallback(action="change_timezone")
-    )
+    builder.button(text="🌍 Изменить часовой пояс", callback_data=ProfileActionCallback(action="change_timezone"))
 
     return builder.as_markup()
 

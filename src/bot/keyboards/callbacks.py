@@ -20,6 +20,7 @@ class ProfileActionCallback(CallbackData, prefix="profile"):
             Возможные значения:
             - "change_timezone": Изменить часовой пояс.
     """
+
     action: str
 
 
