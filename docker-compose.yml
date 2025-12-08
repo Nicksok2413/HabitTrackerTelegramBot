@@ -2,7 +2,8 @@
 x-api-base: &api-base-config
   build:
     context: .  # Контекст сборки - корень проекта
-    dockerfile: docker/api/Dockerfile  # Путь к Dockerfile для API
+    dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
+    target: api  # Этап №3 'api'
   env_file: .env  # Передаем все переменные из .env в контейнер
   volumes:
     - api_logs:/logs  # Монтируем том для логов
@@ -55,7 +56,8 @@ services:
   bot:
     build:
       context: .  # Контекст сборки - корень проекта
-      dockerfile: docker/bot/Dockerfile # Путь к Dockerfile для Телеграм-бота
+      dockerfile: docker/Dockerfile # Путь к общему Dockerfile
+      target: bot  # Этап №4 'bot'
     container_name: habit_tracker_bot
     # Команда для запуска бота (будет передана в entrypoint как "$@")
     command: python src/bot/main.py
@@ -73,7 +75,8 @@ services:
   # scheduler:
   #   build:
   #     context: .  # Контекст сборки - корень проекта
-  #     dockerfile: docker/scheduler/Dockerfile  # Путь к Dockerfile для Планировщика
+  #     dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
+  #     target: scheduler
   #   container_name: habit_tracker_scheduler
   #   env_file:
   #     - .env
