@@ -30,13 +30,6 @@ async def read_users_me(current_user: CurrentUser) -> User:
     return current_user
 
 
-# Здесь можно добавить эндпоинты для обновления данных пользователя самим пользователем,
-# если это предусмотрено (например, смена username, если Telegram это позволяет через API).
-# Однако, основное обновление данных пользователя (first_name, last_name, username)
-# может происходить при каждом вызове /auth/token ботом, если данные изменились в Telegram.
-# Метод UserService.update_user_by_telegram_id может быть вызван внутри /auth/token.
-
-
 @router.patch(
     "/me",
     response_model=UserSchemaRead,

@@ -57,6 +57,11 @@ async def _render_habits_page(
 
     Используется как при первом вызове (отправка сообщения), так и при пагинации (редактирование).
 
+    Реализует "умную пагинацию":
+    - Если текущая страница пуста (например, все элементы удалены),
+      автоматически пытается загрузить предыдущую страницу.
+    - Обрабатывает ошибки API.
+
     Args:
         message_or_callback (Message | CallbackQuery): Объект входящего события (Message или CallbackQuery).
         tg_user (TelegramUser): Пользователь Telegram.
@@ -69,9 +74,6 @@ async def _render_habits_page(
     # Запрашиваем на 1 элемент больше, чтобы узнать, есть ли следующая страница
     limit = PAGE_SIZE + 1
     skip = page * PAGE_SIZE
-
-    # # Определяем объект User (зависит от типа входящего события)
-    # tg_user = message_or_callback.from_user
 
     try:
         habits = await api_client.get_my_habits(
@@ -88,6 +90,21 @@ async def _render_habits_page(
         else:
             if isinstance(message_or_callback, Message):
                 await message_or_callback.answer(text)
+
+        return
+
+    # Если список пуст, но это НЕ первая страница (page > 0)
+    # Пример: пользователь удалил все элементы на последней странице - рекурсивно загружаем предыдущую страницу
+    if not habits and page > 0:
+        log.debug(f"Страница {page} пуста, переходим на страницу {page - 1}")
+
+        await _render_habits_page(
+            message_or_callback=message_or_callback,
+            tg_user=tg_user,
+            api_client=api_client,
+            page=page - 1,
+            is_edit=is_edit
+        )
 
         return
 
@@ -615,7 +632,7 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
     processing_msg = await message.answer("⏳ Сохраняю привычку...")
 
     try:
-        # Отправляем запрос к Backend API
+        # Отправляем запрос к API
         new_habit = await api_client.create_habit(
             tg_user=message.from_user,
             name=habit_name,

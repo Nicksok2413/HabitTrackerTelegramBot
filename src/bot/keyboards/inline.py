@@ -10,7 +10,29 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
+from src.bot.keyboards.callbacks import (
+    HabitActionCallback,
+    HabitDetailCallback,
+    HabitsNavigationCallback,
+    ProfileActionCallback,
+)
+
+
+def get_profile_keyboard() -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру профиля с кнопкой изменения часового пояса.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="🌍 Изменить часовой пояс",
+        callback_data=ProfileActionCallback(action="change_timezone")
+    )
+
+    return builder.as_markup()
 
 
 def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: bool) -> InlineKeyboardMarkup:

@@ -11,6 +11,18 @@
 from aiogram.filters.callback_data import CallbackData
 
 
+class ProfileActionCallback(CallbackData, prefix="profile"):
+    """
+    Данные, связанные с действиями в профиле.
+
+    Attributes:
+        action (str): Тип действия.
+            Возможные значения:
+            - "change_timezone": Изменить часовой пояс.
+    """
+    action: str
+
+
 class HabitsNavigationCallback(CallbackData, prefix="habits_list"):
     """
     Данные для навигации по списку привычек (пагинация).

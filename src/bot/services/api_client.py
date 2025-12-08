@@ -163,6 +163,43 @@ class HabitTrackerClient:
 
     # --- Публичные методы API (Бизнес-логика) ---
 
+    async def get_me(self, tg_user: TelegramUser) -> dict[str, Any]:
+        """
+        Получает информацию о текущем пользователе.
+
+        Использует эндпоинт GET /users/me.
+
+        Args:
+            tg_user (TelegramUser): Пользователь Telegram.
+
+        Returns:
+            dict[str, Any]: Словарь с данными пользователя.
+        """
+        response = await self._request("GET", "/users/me", tg_user)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
+
+    async def update_users_timezone(self, tg_user: TelegramUser, timezone: str) -> dict[str, Any]:
+        """
+        Обновляет данные часового пояса пользователя.
+
+        Использует эндпоинт PATCH /users/me.
+
+        Args:
+            tg_user (TelegramUser): Пользователь Telegram.
+            timezone (str): Данные часового пояса.
+
+        Returns:
+            dict[str, Any]: Словарь с обновленными данными пользователя.
+        """
+        payload = {"timezone": timezone}
+
+        response = await self._request("PATCH", "/users/me", tg_user, json=payload)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
+
     async def get_my_habits(
         self, tg_user: TelegramUser, skip: int = 0, limit: int = 100, active_only: bool = False
     ) -> list[dict[str, Any]]:
@@ -226,13 +263,19 @@ class HabitTrackerClient:
         Args:
             tg_user (TelegramUser): Пользователь Telegram.
             name (str): Название привычки.
-            time_to_remind (str): Время напоминания (ЧЧ:MM).
+            time_to_remind (str): Время напоминания (ожидается формат "HH:MM").
             description (str | None): Описание (опционально).
             target_days (int | None): Целевое кол-во дней (опционально).
 
         Returns:
             dict[str, Any]: JSON-объект привычки.
         """
+        # Нормализуем время напоминания к формату ISO 8601 Time (HH:MM:SS)
+        # Например: "09:00" в "09:00:00"
+        # Это гарантирует, что API Pydantic (time field) точно распарсит значение
+        if len(time_to_remind) == 5:  # Формат HH:MM
+            time_to_remind += ":00"  # Формат HH:MM:SS
+
         payload = {
             "name": name,
             "time_to_remind": time_to_remind,

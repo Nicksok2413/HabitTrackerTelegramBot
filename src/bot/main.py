@@ -16,7 +16,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from src.bot.core.config import settings
-from src.bot.handlers import common, habits
+from src.bot.handlers import common, habits, profile
 from src.bot.services.api_client import HabitTrackerClient
 from src.core_shared.logging_setup import setup_logger
 
@@ -47,6 +47,7 @@ async def main() -> None:
 
     # Регистрация роутеров (хендлеров)
     dp.include_router(habits.router)
+    dp.include_router(profile.router)
     dp.include_router(common.router)
 
     try:
