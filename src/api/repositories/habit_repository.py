@@ -2,7 +2,7 @@
 
 from typing import Any, Sequence
 
-from sqlalchemy import ColumnElement, select
+from sqlalchemy import ColumnElement, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -157,6 +157,40 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         log.debug(f"Найдено {len(habits)} привычек для пользователя ID: {user_id}.")
         return habits
 
+    async def get_habits_needing_notification(self, db_session: AsyncSession) -> Sequence[Habit]:
+        """
+        Находит активные привычки, время напоминания которых совпадает
+        с текущим временем в часовом поясе пользователя.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+
+        Returns:
+            Sequence[Habit]: Список привычек пользователя, о выполнении которых нужно напомнить.
+        """
+        # Мы используем SQL выражение для конвертации UTC времени сервера
+        # в локальное время пользователя, используя его timezone.
+        # CAST(... AS TIME) отбрасывает дату, оставляя только время.
+        # date_trunc('minute', ...) отбрасывает секунды, чтобы сравнивать только ЧЧ:ММ.
+
+        # ВАЖНО: Этот запрос специфичен для PostgreSQL.
+        statement = select(self.model).join(self.model.user).where(
+            self.model.is_active.is_(True),
+            self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
+            self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
+
+            # Сравниваем время:
+            # habit.time_to_remind == (NOW() at time zone user.timezone)::time
+            # Мы округляем до минут, чтобы не пропустить секунды.
+            text(
+                "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)")
+        )
+
+        # Подгружаем пользователя, чтобы знать telegram_id для отправки
+        statement = statement.options(selectinload(self.model.user))
+
+        result = await db_session.execute(statement)
+        return result.scalars().all()
 
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
 # для использования планировщиком, если планировщик будет обращаться к API,

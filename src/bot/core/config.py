@@ -1,9 +1,4 @@
-"""
-Конфигурация Телеграм-бота.
-
-Определяет настройки, загружаемые из переменных окружения (.env),
-и вычисляемые свойства, необходимые для работы приложения.
-"""
+"""Конфигурация Телеграм-бота."""
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,4 +46,4 @@ class Settings(BaseSettings):
 
 
 # Создаем глобальный экземпляр настроек
-settings = Settings()  # type: ignore
+settings = Settings()  # type: ignore[call-arg]
