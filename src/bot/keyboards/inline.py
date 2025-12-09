@@ -123,7 +123,7 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     # Кнопка меню редактирования привычки
     builder.button(
         text="✏️ Редактировать",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.OPEN_EDIT_MENU)
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.OPEN_EDIT_MENU),
     )
 
     # Кнопка удаления
@@ -154,18 +154,25 @@ def get_habit_edit_menu_keyboard(habit_id: int, page: int) -> InlineKeyboardMark
     """
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="📝 Название",
-                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_NAME))
-    builder.button(text="📄 Описание",
-                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DESC))
-    builder.button(text="📅 Цель (дни)",
-                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DAYS))
-    builder.button(text="⏰ Время",
-                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_TIME))
+    builder.button(
+        text="📝 Название",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_NAME),
+    )
+    builder.button(
+        text="📄 Описание",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DESC),
+    )
+    builder.button(
+        text="📅 Цель (дни)",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DAYS),
+    )
+    builder.button(
+        text="⏰ Время", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_TIME)
+    )
 
     builder.button(
         text="🔙 Назад к привычке",
-        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW)
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW),
     )
 
     # Настраиваем макет: по 2 кнопки в ряд, последняя одна

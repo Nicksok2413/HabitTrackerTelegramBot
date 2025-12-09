@@ -194,11 +194,7 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
         return executions
 
     async def get_done_habit_ids_for_date(
-            self,
-            db_session: AsyncSession,
-            *,
-            habit_ids: list[int],
-            check_date: date
+        self, db_session: AsyncSession, *, habit_ids: list[int], check_date: date
     ) -> set[int]:
         """
         Возвращает множество ID привычек, которые были выполнены (DONE) в указанную дату.
@@ -220,7 +216,7 @@ class HabitExecutionRepository(BaseRepository[HabitExecution, HabitExecutionSche
         statement = select(self.model.habit_id).where(
             self.model.habit_id.in_(habit_ids),
             self.model.execution_date == check_date,
-            self.model.status == HabitExecutionStatus.DONE
+            self.model.status == HabitExecutionStatus.DONE,
         )
 
         result = await db_session.execute(statement)

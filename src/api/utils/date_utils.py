@@ -44,9 +44,7 @@ def get_today_date_for_user(user: "User") -> date:
 
     except Exception as exc:
         # Защита от любых других непредвиденных ошибок
-        log.error(
-            f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}", exc_info=True
-        )
+        log.error(f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}", exc_info=True)
         user_timezone = ZoneInfo("UTC")
 
     # Конвертируем UTC время во время пользователя

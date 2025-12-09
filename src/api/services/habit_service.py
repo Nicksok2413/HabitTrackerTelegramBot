@@ -147,9 +147,7 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
 
         # Получаем ID выполненных сегодня привычек
         done_ids = await self.execution_repository.get_done_habit_ids_for_date(
-            db_session,
-            habit_ids=habit_ids,
-            check_date=today
+            db_session, habit_ids=habit_ids, check_date=today
         )
 
         # Собираем итоговый список схем

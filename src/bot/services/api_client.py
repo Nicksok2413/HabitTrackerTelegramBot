@@ -288,12 +288,7 @@ class HabitTrackerClient:
         # Явная типизация для mypy
         return cast(dict[str, Any], response)
 
-    async def update_habit(
-            self,
-            tg_user: TelegramUser,
-            habit_id: int,
-            **kwargs: Any
-    ) -> dict[str, Any]:
+    async def update_habit(self, tg_user: TelegramUser, habit_id: int, **kwargs: Any) -> dict[str, Any]:
         """
         Обновляет поля привычки (PATCH для частичного обновления).
 
@@ -311,7 +306,10 @@ class HabitTrackerClient:
         if "time_to_remind" in kwargs and len(kwargs["time_to_remind"]) == 5:
             kwargs["time_to_remind"] += ":00"
 
-        return await self._request("PATCH", f"/habits/{habit_id}", tg_user, json=kwargs)
+        response = await self._request("PATCH", f"/habits/{habit_id}", tg_user, json=kwargs)
+
+        # Явная типизация для mypy
+        return cast(dict[str, Any], response)
 
     async def change_habit_status(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
         """

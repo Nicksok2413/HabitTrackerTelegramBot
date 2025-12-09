@@ -76,9 +76,9 @@ def _is_done_today(habit_details: dict[str, Any]) -> bool:
 
 
 def _format_habit_text(
-        habit: dict[str, Any],
-        is_done_today: bool,
-        is_new_habit: bool = False,
+    habit: dict[str, Any],
+    is_done_today: bool,
+    is_new_habit: bool = False,
 ) -> str:
     """
     Формирует красивый текст сообщения с информацией о привычке.
@@ -729,10 +729,7 @@ class HabitUpdateParams(TypedDict, total=False):
 
 
 async def _save_habit_change(
-        message: Message,
-        state: FSMContext,
-        api_client: HabitTrackerClient,
-        **changes: Unpack[HabitUpdateParams]
+    message: Message, state: FSMContext, api_client: HabitTrackerClient, **changes: Unpack[HabitUpdateParams]
 ) -> None:
     """
     Отправляет изменения привычки в API и возвращает пользователя к карточке привычки.
@@ -776,11 +773,10 @@ async def _save_habit_change(
         # Чтобы пользователь не "застрял" в диалоге
         await state.clear()
 
+
 # --- Открытие меню редактирования ---
 @router.callback_query(HabitActionCallback.filter(F.action == HabitAction.OPEN_EDIT_MENU))
-async def open_edit_menu(
-        callback: CallbackQuery, callback_data: HabitActionCallback
-) -> None:
+async def open_edit_menu(callback: CallbackQuery, callback_data: HabitActionCallback) -> None:
     """
     Показывает меню выбора поля для редактирования.
 
@@ -788,21 +784,22 @@ async def open_edit_menu(
         callback (CallbackQuery): Объект колбэка от кнопки 'Редактировать'.
         callback_data (HabitActionCallback): Данные с ID привычки.
     """
+    if not isinstance(callback.message, Message):
+        return
+
     await callback.message.edit_text(
         "✏️ <b>Редактирование привычки</b>\n\nЧто вы хотите изменить?",
-        reply_markup=get_habit_edit_menu_keyboard(habit_id=callback_data.habit_id, page=callback_data.page)
+        reply_markup=get_habit_edit_menu_keyboard(habit_id=callback_data.habit_id, page=callback_data.page),
     )
 
 
 # --- Начало редактирования конкретного поля (Роутинг по кнопкам) ---
-@router.callback_query(HabitActionCallback.filter(F.action.in_({
-    HabitAction.EDIT_NAME, HabitAction.EDIT_DESC, HabitAction.EDIT_TIME, HabitAction.EDIT_DAYS
-})))
-async def start_editing_field(
-        callback: CallbackQuery,
-        callback_data: HabitActionCallback,
-        state: FSMContext
-) -> None:
+@router.callback_query(
+    HabitActionCallback.filter(
+        F.action.in_({HabitAction.EDIT_NAME, HabitAction.EDIT_DESC, HabitAction.EDIT_TIME, HabitAction.EDIT_DAYS})
+    )
+)
+async def start_editing_field(callback: CallbackQuery, callback_data: HabitActionCallback, state: FSMContext) -> None:
     """
     Запускает процесс редактирования конкретного поля привычки.
 
@@ -812,6 +809,9 @@ async def start_editing_field(
         state (FSMContext): Контекст машины состояний.
     """
 
+    if not isinstance(callback.message, Message):
+        return
+
     # Сохраняем контекст (ID привычки и страницу списка), чтобы потом вернуться
     await state.update_data(habit_id=callback_data.habit_id, page=callback_data.page)
 
@@ -820,22 +820,16 @@ async def start_editing_field(
 
     # Словарь для переключений состояний - dict[Action, tuple[text, new_state]]
     prompts = {
-        HabitAction.EDIT_NAME: (
-            "Введите новое <b>название</b> привычки:",
-            HabitEditing.waiting_for_new_name
-        ),
+        HabitAction.EDIT_NAME: ("Введите новое <b>название</b> привычки:", HabitEditing.waiting_for_new_name),
         HabitAction.EDIT_DESC: (
             "Введите новое <b>описание</b> (или /empty для удаления существующего):",
-            HabitEditing.waiting_for_new_description
+            HabitEditing.waiting_for_new_description,
         ),
         HabitAction.EDIT_DAYS: (
             "Введите новую <b>цель</b> (количество дней):",
-            HabitEditing.waiting_for_new_target_days
+            HabitEditing.waiting_for_new_target_days,
         ),
-        HabitAction.EDIT_TIME: (
-            "Введите новое <b>время</b> напоминания (ЧЧ:ММ):",
-            HabitEditing.waiting_for_new_time
-        ),
+        HabitAction.EDIT_TIME: ("Введите новое <b>время</b> напоминания (ЧЧ:ММ):", HabitEditing.waiting_for_new_time),
     }
 
     # Ищем действие в словаре
@@ -903,7 +897,7 @@ async def process_habit_new_description(message: Message, state: FSMContext, api
         await message.answer("⚠️ Пожалуйста, отправьте текст или введите /empty.")
         return
 
-    habit_new_description = message.text.strip()
+    habit_new_description: str | None = message.text.strip()
 
     # Логика удаления существующего описания (если команда /empty)
     if habit_new_description == "/empty":
@@ -995,4 +989,3 @@ async def process_habit_new_time(message: Message, state: FSMContext, api_client
         api_client=api_client,
         time_to_remind=new_time_to_remind_str,
     )
-

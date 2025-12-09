@@ -32,6 +32,7 @@ class HabitEditing(StatesGroup):
     - waiting_for_target_days: Ожидание ввода новой цели.
     - waiting_for_time: Ожидание ввода нового времени напоминания (ЧЧ:ММ).
     """
+
     waiting_for_new_name = State()
     waiting_for_new_description = State()
     waiting_for_new_target_days = State()
