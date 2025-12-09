@@ -1,8 +1,7 @@
 """Сервис для работы с выполнениями привычек."""
 
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Sequence
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,8 +10,8 @@ from src.api.core.logging import api_log as log
 from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
 from src.api.repositories import HabitExecutionRepository, HabitRepository
 from src.api.schemas import HabitExecutionSchemaCreate, HabitExecutionSchemaUpdate
-
-from .base_service import BaseService
+from src.api.services import BaseService
+from src.api.utils import get_today_date_for_user
 
 
 class HabitExecutionService(
@@ -78,53 +77,6 @@ class HabitExecutionService(
                 message=f"Привычка '{habit.name}' не активна (в архиве).",
                 error_type="habit_not_active",
             )
-
-    def _get_today_date_for_user(self, user: User) -> date:
-        """
-        Вычисляет текущую дату ("сегодня") с учетом часового пояса пользователя.
-
-        Если часовой пояс пользователя некорректен, используется UTC.
-
-        Args:
-            user (User): habit (Habit): Экземпляр пользователя.
-
-        Returns:
-            date: Объект даты (YYYY-MM-DD), соответствующий "сегодня" для пользователя.
-        """
-        # Получаем текущее абсолютное время в UTC
-        utc_now = datetime.now(timezone.utc)
-
-        # Получаем строку часового пояса пользователя
-        # Если поле пустое или None, используем UTC как дефолт
-        user_timezone_str = user.timezone or "UTC"
-
-        try:
-            # Пытаемся создать объект информации о часовом поясе (IANA time zone)
-            user_timezone = ZoneInfo(user_timezone_str)
-
-        except ZoneInfoNotFoundError:
-            # Если в записана несуществующая таймзона (например, опечатка),
-            # не роняем запрос, а логируем проблему и откатываемся к UTC
-            log.warning(
-                f"Некорректный часовой пояс '{user_timezone_str}' у пользователя ID {user.id}. "
-                "Используется UTC по умолчанию."
-            )
-            user_timezone = ZoneInfo("UTC")
-
-        except Exception as exc:
-            # Защита от любых других непредвиденных ошибок
-            log.error(
-                f"Непредвиденная ошибка при определении времени для пользователя ID {user.id}: {exc}", exc_info=True
-            )
-            user_timezone = ZoneInfo("UTC")
-
-        # Конвертируем UTC время во время пользователя
-        # Метод astimezone() создает новый объект datetime с тем же абсолютным моментом времени,
-        # но с атрибутами year, month, day, hour, скорректированными под смещение таймзоны
-        user_now = utc_now.astimezone(user_timezone)
-
-        # Извлекаем и возвращаем дату "сегодня" для пользователя
-        return user_now.date()
 
     async def _get_habit_by_id(
         self,
@@ -319,7 +271,7 @@ class HabitExecutionService(
             BadRequestException: Если привычка не активна.
         """
         # Определяем дату "сегодня" для пользователя
-        today_user_date = self._get_today_date_for_user(current_user)
+        today_user_date = get_today_date_for_user(current_user)
 
         # Вычисляем дату фиксирования выполнения
         # Если дата передана вручную (execution_date_override), используем её,

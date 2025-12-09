@@ -53,9 +53,10 @@ def get_user_service(repository: UserRepo) -> UserService:
     return UserService(user_repository=repository)
 
 
-def get_habit_service(repository: HabitRepo) -> HabitService:
+# HabitService зависит от HabitRepo и HabitExecutionRepo
+def get_habit_service(repository: HabitRepo, execution_repository: HabitExecutionRepo) -> HabitService:
     """Создает экземпляр сервиса привычек."""
-    return HabitService(habit_repository=repository)
+    return HabitService(habit_repository=repository, execution_repository=execution_repository)
 
 
 # HabitExecutionService зависит от HabitExecutionRepo и HabitRepo

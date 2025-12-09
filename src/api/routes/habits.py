@@ -57,7 +57,7 @@ async def get_habits(
     limit: int = Query(100, ge=1, le=200, description="Максимальное количество записей (пагинация)"),
     # Параметр для фильтрации активных привычек
     active_only: bool = Query(False, description="Вернуть только активные привычки"),
-) -> Sequence[Habit]:
+) -> Sequence[HabitSchemaRead]:
     """
     Получает список привычек для текущего пользователя.
 
