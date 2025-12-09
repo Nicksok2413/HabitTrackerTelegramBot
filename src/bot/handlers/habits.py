@@ -2,16 +2,18 @@
 Обработчики сценариев работы с привычками.
 
 Включает в себя:
-- FSM для создания новой привычки: название -> описание -> цель -> время напоминания -> Сохранение в API.
 - Просмотр списка привычек (Pagination).
 - Просмотр деталей привычки.
 - Отметку выполнения/отмены выполнения привычки.
 - Удаление привычки.
+- FSM для создания новой привычки: название -> описание -> цель -> время напоминания -> Сохранение в API.
+- FSM для редактирования существующей привычки.
 """
 
 from contextlib import suppress
 from datetime import date
 from re import match
+from typing import Any
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -47,6 +49,75 @@ PAGE_SIZE = 5
 
 
 # ==============================================================================
+# Вспомогательные функции (Helpers)
+# ==============================================================================
+
+
+def _is_done_today(habit_details: dict[str, Any]) -> bool:
+    """
+    Проверяет, есть ли в истории выполнений запись за сегодня со статусом 'done'.
+
+    Args:
+        habit_details (dict[str, Any]): Словарь с данными привычки, включая ключ 'executions'.
+
+    Returns:
+        bool: True - если привычка выполнена сегодня, иначе False.
+    """
+    today_str = date.today().isoformat()  # 'YYYY-MM-DD'
+
+    executions = habit_details.get("executions", [])
+
+    for execution in executions:
+        # Сравниваем строки дат
+        if execution.get("execution_date") == today_str and execution.get("status") == "done":
+            return True
+
+    return False
+
+
+def _format_habit_text(
+        habit: dict[str, Any],
+        is_done_today: bool,
+        is_new_habit: bool = False,
+) -> str:
+    """
+    Формирует красивый текст сообщения с информацией о привычке.
+
+    Args:
+        habit (dict[str, Any]): Словарь с данными привычки.
+        is_done_today (bool): Флаг, определяющий статус выполнения привычки на сегодня.
+        is_new_habit (bool): Флаг, определяющий была ли только что создана новая привычка (по умолчанию - False).
+
+    Returns:
+        str: Отформатированный текст сообщения (HTML).
+    """
+
+    status_text = "✅ <b>Выполнено сегодня</b>" if is_done_today else "⏳ <b>Ждет выполнения</b>"
+    habit_description_text = f"📝 <i>{habit['description']}</i>" if habit.get("description") else ""
+    formatted_time = habit["time_to_remind"][:5]  # API возвращает "ЧЧ:ММ:СС", берем первые 5 символов "ЧЧ:ММ"
+
+    last_line = "Удачи в достижении цели! 💪" if is_new_habit else status_text
+
+    text = (
+        f"📌 <b>{habit['name']}</b>\n\n"
+        f"{habit_description_text}\n"
+        f"🔥 Стрик: <b>{habit['current_streak']} дн.</b> (Рекорд: {habit['max_streak']})\n"
+        f"⏰ Напоминание: {formatted_time}\n"
+        f"📅 Цель: {habit['target_days']} дн.\n"
+        f"──────────────────\n"
+        f"{last_line}"
+    )
+
+    if is_new_habit:
+        text = "🎉 <b>Привычка успешно создана!</b>\n\n" + text
+
+    # Убираем двойные переносы строк, если описания нет
+    text = text.replace("\n\n\n", "\n\n")
+
+    return text
+
+
+# ==============================================================================
 # Просмотр списка привычек (List View)
 # ==============================================================================
 
@@ -59,23 +130,17 @@ async def _render_habits_page(
     is_edit: bool = False,
 ) -> None:
     """
-    Вспомогательная функция для отображения страницы списка привычек.
+    Отображает страницу списка привычек (List View).
 
-    Используется как при первом вызове (отправка сообщения), так и при пагинации (редактирование).
-
-    Реализует "умную пагинацию":
-    - Если текущая страница пуста (например, все элементы удалены),
-      автоматически пытается загрузить предыдущую страницу.
-    - Обрабатывает ошибки API.
+    Реализует "умную пагинацию": рекурсивно загружает предыдущую страницу,
+    если текущая оказалась пустой (например, после удаления элементов).
 
     Args:
         message_or_callback (Message | CallbackQuery): Объект входящего события (Message или CallbackQuery).
         tg_user (TelegramUser): Пользователь Telegram.
         api_client (HabitTrackerClient): Клиент API.
         page (int): Номер страницы.
-        is_edit (bool): Флаг режима редактирования.
-                        Если True - редактируем существующее сообщение (для пагинации).
-                        Если False - отправляем новое сообщение.
+        is_edit (bool): Если True, редактирует текущее сообщение. Иначе отправляет новое.
     """
     # Запрашиваем на 1 элемент больше, чтобы узнать, есть ли следующая страница
     limit = PAGE_SIZE + 1
@@ -88,7 +153,7 @@ async def _render_habits_page(
             limit=limit,
         )
     except APIClientError:
-        text = "Не удалось загрузить список привычек."
+        text = "❌ Не удалось загрузить список привычек."
 
         if is_edit and isinstance(message_or_callback, CallbackQuery):
             with suppress(Exception):
@@ -99,8 +164,7 @@ async def _render_habits_page(
 
         return
 
-    # Если список пуст, но это НЕ первая страница (page > 0)
-    # Пример: пользователь удалил все элементы на последней странице - рекурсивно загружаем предыдущую страницу
+    # Рекурсивный переход на предыдущую страницу, если текущая пуста (но это не первая)
     if not habits and page > 0:
         log.debug(f"Страница {page} пуста, переходим на страницу {page - 1}")
 
@@ -154,7 +218,11 @@ async def show_my_habits(message: Message, api_client: HabitTrackerClient) -> No
         return
 
     await _render_habits_page(
-        message_or_callback=message, tg_user=message.from_user, api_client=api_client, page=0, is_edit=False
+        message_or_callback=message,
+        tg_user=message.from_user,
+        api_client=api_client,
+        page=0,
+        is_edit=False,
     )
 
 
@@ -191,69 +259,6 @@ async def navigate_habits_list(
 # ==============================================================================
 
 
-def _is_done_today(habit_details: dict) -> bool:
-    """
-    Проверяет, есть ли в истории выполнений запись за сегодня со статусом 'done'.
-
-    Args:
-        habit_details: Словарь с данными привычки, включая ключ 'executions'.
-
-    Returns:
-        bool: True - если привычка выполнена сегодня, иначе False.
-    """
-    today_str = date.today().isoformat()  # 'YYYY-MM-DD'
-
-    executions = habit_details.get("executions", [])
-
-    for execution in executions:
-        # Сравниваем строки дат
-        if execution.get("execution_date") == today_str and execution.get("status") == "done":
-            return True
-
-    return False
-
-
-def _format_habit_text(
-        habit: dict,
-        is_done_today: bool,
-        is_new_habit: bool = False,
-) -> str:
-    """
-    Вспомогательная функция для формирования красивого текста сообщения.
-
-    Если создается новая привычка, формирует соответствующий текст сообщения.
-
-    Args:
-        habit (dict): Словарь с данными привычки.
-        is_done_today (bool): Флаг, определяющий статус выполнения привычки на сегодня.
-        is_new_habit (bool): Флаг, определяющий была и создана новая привычка (по умолчанию - False).
-
-    Returns:
-        str: Красивый текст для сообщения.
-    """
-
-    status_text = "✅ <b>Выполнено сегодня</b>" if is_done_today else "⏳ <b>Ждет выполнения</b>"
-    habit_description_text = f"📝 <i>{habit['description']}</i>" if habit.get("description") else ""
-    formatted_time = habit["time_to_remind"][:5]  # API возвращает "ЧЧ:ММ:СС", берем первые 5 символов "ЧЧ:ММ"
-
-    last_line = "Удачи в достижении цели! 💪" if is_new_habit else status_text
-
-    text = (
-        f"📌 <b>{habit['name']}</b>\n\n"
-        f"{habit_description_text}\n\n"
-        f"🔥 Стрик: <b>{habit['current_streak']} дн.</b> (Рекорд: {habit['max_streak']})\n"
-        f"⏰ Напоминание: {formatted_time}\n"
-        f"📅 Цель: {habit['target_days']} дн.\n"
-        f"──────────────────\n"
-        f"{last_line}"
-    )
-
-    if is_new_habit:
-        text = "🎉 <b>Привычка успешно создана!</b>\n\n" + text
-
-    return text
-
-
 async def _render_habit_details(
     callback: CallbackQuery,
     habit_id: int,
@@ -261,7 +266,7 @@ async def _render_habit_details(
     api_client: HabitTrackerClient,
 ) -> None:
     """
-    Вспомогательная функция для отрисовки карточки детализации привычки.
+    Отображает детальную карточку привычки.
 
     Загружает детали привычки и обновляет сообщение с информацией.
 
@@ -289,9 +294,9 @@ async def _render_habit_details(
         is_done = _is_done_today(habit)
 
         # Формируем красивый текст
-        text = _format_habit_text(habit=habit, is_done_today=is_done)
+        text = _format_habit_text(habit=habit, is_done_today=is_done, is_new_habit=False)
 
-        # Клавиатура с кнопками действий (выполнить, отменить выполнение, удалить и назад)
+        # Клавиатура с кнопками действий (выполнить, отменить выполнение, редактировать, удалить и назад)
         keyboard = get_habit_detail_keyboard(
             habit_id=habit["id"],
             page=page,
@@ -311,7 +316,7 @@ async def _render_habit_details(
         # В случае ошибки API показываем всплывающее уведомление
         # Используем suppress на случай, если callback.answer уже был вызван выше
         with suppress(Exception):
-            await callback.answer("Не удалось загрузить данные о привычке.", show_alert=True)
+            await callback.answer("❌ Не удалось загрузить данные о привычке.", show_alert=True)
 
 
 @router.callback_query(HabitDetailCallback.filter())
@@ -327,7 +332,10 @@ async def show_habit_details(
         api_client (HabitTrackerClient): Клиент API.
     """
     await _render_habit_details(
-        callback=callback, habit_id=callback_data.habit_id, page=callback_data.page, api_client=api_client
+        callback=callback,
+        habit_id=callback_data.habit_id,
+        page=callback_data.page,
+        api_client=api_client,
     )
 
 
@@ -344,7 +352,10 @@ async def return_to_habit_details(
         api_client (HabitTrackerClient): Клиент API.
     """
     await _render_habit_details(
-        callback=callback, habit_id=callback_data.habit_id, page=callback_data.page, api_client=api_client
+        callback=callback,
+        habit_id=callback_data.habit_id,
+        page=callback_data.page,
+        api_client=api_client,
     )
 
 
@@ -368,7 +379,7 @@ async def toggle_habit_status(
         api_client (HabitTrackerClient): Клиент API.
     """
     # Определяем целевой статус для API
-    target_status = "done" if callback_data.action == "done" else "pending"
+    target_status = "done" if callback_data.action == HabitAction.DONE else "pending"
 
     try:
         # Отправляем запрос в API
@@ -388,18 +399,328 @@ async def toggle_habit_status(
 
     except APIClientError:
         with suppress(Exception):
-            await callback.answer("Ошибка при обновлении статуса привычки.", show_alert=True)
+            await callback.answer("❌ Ошибка при обновлении статуса привычки.", show_alert=True)
 
 
-# --- Логика редактирования привычки ---
+# --- Логика удаления привычки ---
 
+
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.REQUEST_DELETE))
+async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActionCallback) -> None:
+    """
+    Запрашивает подтверждение удаления привычки.
+
+    Args:
+        callback (CallbackQuery): Объект колбэка от кнопки 'Удалить'.
+        callback_data (HabitActionCallback): Данные с ID привычки.
+    """
+    # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
+    await callback.answer()
+
+    if not callback.message or not isinstance(callback.message, Message):
+        return
+
+    # Клавиатура с кнопками действий
+    keyboard = get_habit_delete_confirmation_keyboard(habit_id=callback_data.habit_id, page=callback_data.page)
+
+    await callback.message.edit_text(
+        "⚠️ <b>Вы действительно хотите удалить эту привычку?</b>\n\n"
+        "Это действие нельзя будет отменить. Вся история выполнений будет потеряна.",
+        reply_markup=keyboard,
+    )
+
+
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.CONFIRM_DELETE))
+async def confirm_habit_delete(
+    callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
+) -> None:
+    """
+    Выполняет удаление привычки после подтверждения.
+
+    Args:
+        callback (CallbackQuery): Объект колбэка от кнопки 'Да, удалить навсегда'.
+        callback_data (HabitActionCallback): Данные с ID привычки.
+        api_client (HabitTrackerClient): Клиент API.
+    """
+
+    try:
+        # Удаляем через API
+        await api_client.delete_habit(callback.from_user, callback_data.habit_id)
+
+        await callback.answer("✅ Привычка удалена.")
+
+        # Возвращаемся к списку (на страницу, с которой перешли)
+        await _render_habits_page(
+            message_or_callback=callback,
+            tg_user=callback.from_user,
+            api_client=api_client,
+            page=callback_data.page,
+            is_edit=True,
+        )
+
+    except APIClientError:
+        with suppress(Exception):
+            await callback.answer("❌ Не удалось удалить привычку. Попробуйте позже.", show_alert=True)
+        # Если ошибка, возвращаем пользователя к просмотру привычки
+        await _render_habit_details(
+            callback=callback,
+            habit_id=callback_data.habit_id,
+            page=callback_data.page,
+            api_client=api_client,
+        )
+
+
+# ==============================================================================
+# Создание привычки (FSM)
+# ==============================================================================
+
+# --- Начало (по нажатию кнопки) ---
+
+
+@router.message(F.text == BTN_CREATE_HABIT)
+async def start_habit_creation(message: Message, state: FSMContext) -> None:
+    """
+    Начинает процесс создания новой привычки.
+
+    Срабатывает при нажатии кнопки "➕ Создать привычку".
+    Переводит бота в состояние ожидания названия привычки.
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+    """
+    if not message.from_user:
+        return
+
+    log.info(f"Пользователь {message.from_user.id} начал создание привычки.")
+
+    await message.answer(
+        "✨ <b>Создание новой привычки</b>\n\n"
+        "Введите название привычки (например: <i>'Читать 30 минут'</i>, <i>'Выпить стакан воды'</i>).\n"
+        "Или нажмите /cancel для отмены.",
+        # Убираем клавиатуру меню, чтобы не мешала
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+    # Переводим бота в состояние ожидания названия
+    await state.set_state(HabitCreation.waiting_for_name)
+
+
+# --- Получение названия ---
+
+
+@router.message(HabitCreation.waiting_for_name)
+async def process_habit_name(message: Message, state: FSMContext) -> None:
+    """
+    Принимает название привычки.
+
+    Валидирует ввод (должен быть текст) и переводит бота в состояние ожидания описания привычки.
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+    """
+    if not message.text:
+        await message.answer("⚠️ Пожалуйста, отправьте текстовое сообщение с названием привычки.")
+        return
+
+    habit_name = message.text.strip()
+
+    # Простая валидация длины
+    if len(habit_name) > 100:
+        await message.answer("⚠️ Название привычки слишком длинное. Пожалуйста, сократите до 100 символов.")
+        return
+
+    # Сохраняем данные в контекст FSM
+    await state.update_data(name=habit_name)
+
+    await message.answer(
+        f"👍 Отлично, название: <b>{habit_name}</b>.\n\n"
+        "Теперь добавьте краткое описание или мотивацию (зачем вам это?).\n"
+        "Отправьте /skip, если хотите пропустить этот шаг."
+    )
+
+    # Переводим бота в состояние ожидания описания
+    await state.set_state(HabitCreation.waiting_for_description)
+
+
+# --- Получение описания ---
+
+
+@router.message(HabitCreation.waiting_for_description)
+async def process_habit_description(message: Message, state: FSMContext) -> None:
+    """
+    Принимает описание привычки.
+
+    Поддерживает команду /skip для пропуска шага (description будет None).
+    Переводит бота в состояние ожидания цели (количества дней).
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+    """
+    if not message.text:
+        await message.answer("⚠️ Пожалуйста, отправьте текст или нажмите /skip.")
+        return
+
+    habit_description: str | None = message.text.strip()
+
+    # Логика пропуска шага (если команда /skip)
+    if habit_description == "/skip":
+        habit_description = None
+
+    # Сохраняем данные в контекст FSM
+    await state.update_data(description=habit_description)
+
+    await message.answer(
+        "📅 <b>Цель привычки</b>\n\n"
+        "Сколько дней вы хотите придерживаться этой привычки?\n"
+        "Обычно привычка формируется за <b>21 день</b>.\n\n"
+        "Введите число (например, 30) или нажмите /skip для использования 21 дня."
+    )
+
+    # Переводим бота в состояние ожидания цели (количества дней)
+    await state.set_state(HabitCreation.waiting_for_target_days)
+
+
+# --- Получение цели (количества дней) ---
+@router.message(HabitCreation.waiting_for_target_days)
+async def process_habit_target_days(message: Message, state: FSMContext) -> None:
+    """
+    Принимает цель (количество дней) для формирования привычки.
+
+    Поддерживает команду /skip для пропуска шага (description будет None).
+    Валидирует ввод (должен быть натуральное число) и переводит бота в состояние ожидания времени напоминания.
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+    """
+    answer_text = "⚠️ Пожалуйста, введите натуральное число (от 1 и более) или нажмите /skip."
+
+    if not message.text:
+        await message.answer(answer_text)
+        return
+
+    text = message.text.strip()
+    habit_target_days = None
+
+    # Если не /skip, пытаемся распарсить число
+    if text != "/skip":
+        if not text.isdigit() or int(text) < 1:
+            await message.answer(answer_text)
+            return
+
+        habit_target_days = int(text)
+
+    # Сохраняем данные в контекст FSM
+    await state.update_data(target_days=habit_target_days)
+
+    await message.answer(
+        "⏰ <b>Время напоминания</b>\n\n"
+        "В какое время вам напоминать о привычке?\n"
+        "Введите время в формате <b>ЧЧ:ММ</b> (24-часовой формат).\n"
+        "Примеры: <code>08:00</code>, <code>14:30</code>, <code>22:00</code>."
+    )
+
+    # Переводим бота в состояние ожидания времени напоминания
+    await state.set_state(HabitCreation.waiting_for_time)
+
+
+# --- Получение времени и сохранение ---
+
+
+@router.message(HabitCreation.waiting_for_time)
+async def process_habit_time(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
+    """
+    Принимает время, валидирует его и отправляет запрос на создание привычки в API.
+
+    Это финальный шаг сценария.
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+        api_client (HabitTrackerClient): Инъекция клиента API.
+    """
+
+    if not message.text or not message.from_user:
+        await message.answer("⚠️ Введите время текстом в формате ЧЧ:ММ.")
+        return
+
+    time_to_remind_str = message.text.strip()
+
+    # Если пользователь ввел Ч:ММ, дополним до ЧЧ:ММ
+    if len(time_to_remind_str) == 4 and time_to_remind_str[1] == ":":
+        time_to_remind_str = "0" + time_to_remind_str
+
+    # Валидация формата времени через регулярное выражение
+    # ^([0-1]?[0-9]|2[0-3]) - часы от 00 до 23
+    # :[0-5][0-9]$ - минуты от 00 до 59
+    time_pattern = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+
+    if not match(time_pattern, time_to_remind_str):
+        await message.answer(
+            "⚠️ <b>Неверный формат времени.</b>\n\n"
+            "Пожалуйста, введи время в формате ЧЧ:ММ (24-часовой формат).\n"
+            "Пример: <code>07:30</code>"
+        )
+        return
+
+    # Получаем все накопленные данные из машины состояний
+    data = await state.get_data()
+    habit_name = data["name"]
+    habit_description = data.get("description")
+    habit_target_days = data.get("target_days")
+
+    # Сообщаем пользователю, что процесс идет
+    processing_msg = await message.answer("⏳ Сохраняю привычку...")
+
+    try:
+        # Отправляем запрос к API
+        new_habit = await api_client.create_habit(
+            tg_user=message.from_user,
+            name=habit_name,
+            description=habit_description,
+            time_to_remind=time_to_remind_str,
+            target_days=habit_target_days,
+        )
+
+        # Удаляем сообщение "Сохраняю..."
+        await processing_msg.delete()
+
+        # Формируем красивый ответ
+        text = _format_habit_text(habit=new_habit, is_done_today=False, is_new_habit=True)
+
+        await message.answer(
+            text=text,
+            reply_markup=get_main_menu_keyboard(),  # Возвращаем главное меню
+        )
+        log.info(f"Привычка '{habit_name}' создана для пользователя {message.from_user.id}.")
+
+    except APIClientError as exc:
+        await processing_msg.delete()
+        log.error(f"Ошибка при сохранении привычки для {message.from_user.id}: {exc}")
+
+        await message.answer(
+            "❌ <b>Произошла ошибка при сохранении.</b>\nПожалуйста, попробуйте еще раз позже.",
+            reply_markup=get_main_menu_keyboard(),
+        )
+    finally:
+        # В любом случае (успех или ошибка) сбрасываем состояние FSM
+        # Чтобы пользователь не "застрял" в диалоге
+        await state.clear()
+
+
+# ==============================================================================
+# Редактирование привычки (FSM: HabitEditing)
+# ==============================================================================
 
 async def _save_habit_change(
         message: Message,
         state: FSMContext,
         api_client: HabitTrackerClient,
         **changes
-):
+) -> None:
     """
     Отправляет изменения в API и возвращает пользователя к просмотру привычки.
     """
@@ -557,314 +878,3 @@ async def process_new_days(message: Message, state: FSMContext, api_client: Habi
         return await message.answer("Число должно быть > 0.")
 
     await _save_habit_change(message, state, api_client, target_days=days)
-
-
-# --- Логика удаления привычки ---
-
-
-@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.REQUEST_DELETE))
-async def request_habit_delete(callback: CallbackQuery, callback_data: HabitActionCallback) -> None:
-    """
-    Запрашивает подтверждение удаления привычки.
-
-    Args:
-        callback (CallbackQuery): Объект колбэка от кнопки 'Удалить'.
-        callback_data (HabitActionCallback): Данные с ID привычки.
-    """
-    # Всегда отвечаем на callback, чтобы убрать часики загрузки у кнопки
-    await callback.answer()
-
-    if not callback.message or not isinstance(callback.message, Message):
-        return
-
-    keyboard = get_habit_delete_confirmation_keyboard(habit_id=callback_data.habit_id, page=callback_data.page)
-
-    await callback.message.edit_text(
-        "⚠️ <b>Вы действительно хотите удалить эту привычку?</b>\n\n"
-        "Это действие нельзя будет отменить. Вся история выполнений будет потеряна.",
-        reply_markup=keyboard,
-    )
-
-
-@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.CONFIRM_DELETE))
-async def confirm_habit_delete(
-    callback: CallbackQuery, callback_data: HabitActionCallback, api_client: HabitTrackerClient
-) -> None:
-    """
-    Выполняет удаление привычки после подтверждения.
-
-    Args:
-        callback (CallbackQuery): Объект колбэка от кнопки 'Да, удалить навсегда'.
-        callback_data (HabitActionCallback): Данные с ID привычки.
-        api_client (HabitTrackerClient): Клиент API.
-    """
-
-    try:
-        # Удаляем через API
-        await api_client.delete_habit(callback.from_user, callback_data.habit_id)
-
-        await callback.answer("✅ Привычка удалена.")
-
-        # Возвращаемся к списку (на страницу, с которой перешли)
-        await _render_habits_page(
-            message_or_callback=callback,
-            tg_user=callback.from_user,
-            api_client=api_client,
-            page=callback_data.page,
-            is_edit=True,
-        )
-
-    except APIClientError:
-        with suppress(Exception):
-            await callback.answer("Не удалось удалить привычку. Попробуйте позже.", show_alert=True)
-        # Если ошибка, возвращаем пользователя к просмотру привычки
-        await _render_habit_details(
-            callback=callback, habit_id=callback_data.habit_id, page=callback_data.page, api_client=api_client
-        )
-
-
-# ==============================================================================
-# Создание привычки (FSM)
-# ==============================================================================
-
-# --- Начало (по нажатию кнопки) ---
-
-
-@router.message(F.text == BTN_CREATE_HABIT)
-async def start_habit_creation(message: Message, state: FSMContext) -> None:
-    """
-    Начинает процесс создания новой привычки.
-
-    Срабатывает при нажатии кнопки "➕ Создать привычку".
-    Переводит бота в состояние ожидания названия привычки.
-
-    Args:
-        message (Message): Объект сообщения Telegram.
-        state (FSMContext): Контекст машины состояний.
-    """
-    if not message.from_user:
-        return
-
-    log.info(f"Пользователь {message.from_user.id} начал создание привычки.")
-
-    await message.answer(
-        "✨ <b>Создание новой привычки</b>\n\n"
-        "Введите название привычки (например: <i>'Читать 30 минут'</i>, <i>'Выпить стакан воды'</i>).\n"
-        "Или нажмите /cancel для отмены.",
-        # Убираем клавиатуру меню, чтобы не мешала
-        reply_markup=ReplyKeyboardRemove(),
-    )
-
-    # Переводим бота в состояние ожидания названия
-    await state.set_state(HabitCreation.waiting_for_name)
-
-
-# --- Получение названия ---
-
-
-@router.message(HabitCreation.waiting_for_name)
-async def process_habit_name(message: Message, state: FSMContext) -> None:
-    """
-    Принимает название привычки.
-
-    Валидирует ввод (должен быть текст) и переводит бота в состояние ожидания описания привычки.
-
-    Args:
-        message (Message): Объект сообщения Telegram.
-        state (FSMContext): Контекст машины состояний.
-    """
-    if not message.text:
-        await message.answer("⚠️ Пожалуйста, отправьте текстовое сообщение с названием привычки.")
-        return
-
-    habit_name = message.text.strip()
-
-    # Простая валидация длины
-    if len(habit_name) > 100:
-        await message.answer("⚠️ Название привычки слишком длинное. Пожалуйста, сократите до 100 символов.")
-        return
-
-    # Сохраняем данные в контекст FSM
-    await state.update_data(name=habit_name)
-
-    await message.answer(
-        f"👍 Отлично, название: <b>{habit_name}</b>.\n\n"
-        "Теперь добавьте краткое описание или мотивацию (зачем вам это?).\n"
-        "Отправьте /skip, если хотите пропустить этот шаг."
-    )
-
-    # Переводим бота в состояние ожидания описания
-    await state.set_state(HabitCreation.waiting_for_description)
-
-
-# --- Получение описания ---
-
-
-@router.message(HabitCreation.waiting_for_description)
-async def process_habit_description(message: Message, state: FSMContext) -> None:
-    """
-    Принимает описание привычки.
-
-    Поддерживает команду /skip для пропуска шага (description будет None).
-    Переводит бота в состояние ожидания цели (количества дней).
-
-    Args:
-        message (Message): Объект сообщения Telegram.
-        state (FSMContext): Контекст машины состояний.
-    """
-    if not message.text:
-        await message.answer("⚠️ Пожалуйста, отправьте текст или нажмите /skip.")
-        return
-
-    habit_description: str | None = message.text.strip()
-
-    # Логика пропуска шага (если команда /skip)
-    if habit_description == "/skip":
-        habit_description = None
-
-    # Сохраняем данные в контекст FSM
-    await state.update_data(description=habit_description)
-
-    await message.answer(
-        "📅 <b>Цель привычки</b>\n\n"
-        "Сколько дней вы хотите придерживаться этой привычки?\n"
-        "Обычно привычка формируется за <b>21 день</b>.\n\n"
-        "Введите число (например, 30) или нажмите /skip для использования 21 дня."
-    )
-
-    # Переводим бота в состояние ожидания цели (количества дней)
-    await state.set_state(HabitCreation.waiting_for_target_days)
-
-
-# --- Получение цели (количества дней) ---
-@router.message(HabitCreation.waiting_for_target_days)
-async def process_habit_target_days(message: Message, state: FSMContext) -> None:
-    """
-    Принимает цель (количество дней) для формирования привычки.
-
-    Поддерживает команду /skip для пропуска шага (description будет None).
-    Валидирует ввод (должен быть натуральное число) и переводит бота в состояние ожидания времени напоминания.
-
-    Args:
-        message (Message): Объект сообщения Telegram.
-        state (FSMContext): Контекст машины состояний.
-    """
-    answer_text = "⚠️ Пожалуйста, введите натуральное число (от 1 и более) или нажмите /skip."
-
-    if not message.text:
-        await message.answer(answer_text)
-        return
-
-    text = message.text.strip()
-    habit_target_days = None
-
-    # Если не /skip, пытаемся распарсить число
-    if text != "/skip":
-        if not text.isdigit():
-            await message.answer(answer_text)
-            return
-
-        habit_target_days = int(text)
-
-        if habit_target_days < 1:
-            await message.answer(answer_text)
-            return
-
-    # Сохраняем данные в контекст FSM
-    await state.update_data(target_days=habit_target_days)
-
-    await message.answer(
-        "⏰ <b>Время напоминания</b>\n\n"
-        "В какое время вам напоминать о привычке?\n"
-        "Введите время в формате <b>ЧЧ:ММ</b> (24-часовой формат).\n"
-        "Примеры: <code>08:00</code>, <code>14:30</code>, <code>22:00</code>."
-    )
-
-    # Переводим бота в состояние ожидания времени напоминания
-    await state.set_state(HabitCreation.waiting_for_time)
-
-
-# --- Получение времени и сохранение ---
-
-
-@router.message(HabitCreation.waiting_for_time)
-async def process_habit_time(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
-    """
-    Принимает время, валидирует его и отправляет запрос на создание привычки в API.
-
-    Это финальный шаг сценария.
-
-    Args:
-        message (Message): Объект сообщения Telegram.
-        state (FSMContext): Контекст машины состояний.
-        api_client (HabitTrackerClient): Инъекция клиента API.
-    """
-    if not message.from_user:
-        return
-
-    if not message.text:
-        await message.answer("⚠️ Введите время текстом в формате ЧЧ:ММ.")
-        return
-
-    time_to_remind_str = message.text.strip()
-
-    # Если пользователь ввел Ч:ММ, дополним до ЧЧ:ММ
-    if len(time_to_remind_str) == 4 and time_to_remind_str[1] == ":":
-        time_to_remind_str = "0" + time_to_remind_str
-
-    # Валидация формата времени через регулярное выражение
-    # ^([0-1]?[0-9]|2[0-3]) - часы от 00 до 23
-    # :[0-5][0-9]$ - минуты от 00 до 59
-    time_pattern = r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
-
-    if not match(time_pattern, time_to_remind_str):
-        await message.answer(
-            "⚠️ <b>Неверный формат времени.</b>\n\n"
-            "Пожалуйста, введи время в формате ЧЧ:ММ (24-часовой формат).\n"
-            "Пример: <code>07:30</code>"
-        )
-        return
-
-    # Получаем все накопленные данные из машины состояний
-    data = await state.get_data()
-    habit_name = data["name"]
-    habit_description = data.get("description")
-    habit_target_days = data.get("target_days")
-
-    # Сообщаем пользователю, что процесс идет
-    processing_msg = await message.answer("⏳ Сохраняю привычку...")
-
-    try:
-        # Отправляем запрос к API
-        new_habit = await api_client.create_habit(
-            tg_user=message.from_user,
-            name=habit_name,
-            description=habit_description,
-            time_to_remind=time_to_remind_str,
-            target_days=habit_target_days,
-        )
-
-        # Удаляем сообщение "Сохраняю..."
-        await processing_msg.delete()
-
-        # Формируем красивый ответ
-        text = _format_habit_text(habit=new_habit, is_done_today=False, is_new_habit=True)
-
-        await message.answer(
-            text=text,
-            reply_markup=get_main_menu_keyboard(),  # Возвращаем главное меню
-        )
-        log.info(f"Привычка '{habit_name}' создана для пользователя {message.from_user.id}.")
-
-    except APIClientError as exc:
-        await processing_msg.delete()
-        log.error(f"Ошибка при сохранении привычки для {message.from_user.id}: {exc}")
-
-        await message.answer(
-            "😔 <b>Произошла ошибка при сохранении.</b>\nПожалуйста, попробуйте еще раз позже.",
-            reply_markup=get_main_menu_keyboard(),
-        )
-    finally:
-        # В любом случае (успех или ошибка) сбрасываем состояние FSM
-        # Чтобы пользователь не "застрял" в диалоге
-        await state.clear()
