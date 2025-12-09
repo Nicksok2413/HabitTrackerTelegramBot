@@ -96,12 +96,12 @@ async def get_habit(
     return await habit_service.get_habit_by_id_for_user(db_session, habit_id=habit_id, current_user=current_user)
 
 
-@router.put(
+@router.patch(
     "/{habit_id}",
     response_model=HabitSchemaRead,
     status_code=status.HTTP_200_OK,
     summary="Обновление привычки по ID",
-    description="Обновляет данные привычки, если она принадлежит пользователю.",
+    description="Частично обновляет данные привычки (PATCH), если она принадлежит пользователю.",
 )
 async def update_habit(
     db_session: DBSession,
