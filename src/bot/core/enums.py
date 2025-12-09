@@ -19,6 +19,13 @@ class HabitAction(StrEnum):
     REQUEST_DELETE = "req_del"  # Запрос удаления
     CONFIRM_DELETE = "conf_del"  # Подтверждение удаления
 
+    # --- Действия для редактирования привычки ---
+    OPEN_EDIT_MENU = "open_edit"  # Открыть меню редактирования
+    EDIT_NAME = "edit_name"  # Редактировать название
+    EDIT_DESC = "edit_desc"  # Редактировать описание
+    EDIT_TIME = "edit_time"  # Редактировать время
+    EDIT_DAYS = "edit_days"  # Редактировать цель
+
 
 class ProfileAction(StrEnum):
     """Действия в профиле."""

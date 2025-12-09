@@ -288,6 +288,29 @@ class HabitTrackerClient:
         # Явная типизация для mypy
         return cast(dict[str, Any], response)
 
+    async def update_habit(
+            self,
+            tg_user: TelegramUser,
+            habit_id: int,
+            **kwargs: Any
+    ) -> dict[str, Any]:
+        """
+        Обновляет поля привычки.
+
+        Args:
+            tg_user: Пользователь Telegram.
+            habit_id: ID привычки.
+            **kwargs: Поля для обновления (name, description, time_to_remind, target_days, is_active).
+
+        Returns:
+            dict[str, Any]: Словарь с данными обновленного объекта привычки.
+        """
+        # Если передано время, нормализуем его
+        if "time_to_remind" in kwargs and len(kwargs["time_to_remind"]) == 5:
+            kwargs["time_to_remind"] += ":00"
+
+        return await self._request("PUT", f"/habits/{habit_id}", tg_user, json=kwargs)
+
     async def change_habit_status(self, tg_user: TelegramUser, habit_id: int, status: str = "done") -> dict[str, Any]:
         """
         Фиксирует выполнение или отмену выполнения привычки на сегодняшний день.
