@@ -676,7 +676,7 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
     habit_description = data.get("description")
     habit_target_days = data.get("target_days")
 
-    # Сообщаем пользователю, что процесс идет
+    # Если валидация прошла, начинаем процесс сохранения
     processing_msg = await message.answer("⏳ Сохраняю привычку...")
 
     try:
@@ -689,9 +689,6 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
             target_days=habit_target_days,
         )
 
-        # Удаляем сообщение "Сохраняю..."
-        await processing_msg.delete()
-
         # Формируем красивый ответ
         text = _format_habit_text(habit=new_habit, is_done_today=False, is_new_habit=True)
 
@@ -702,14 +699,17 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
         log.info(f"Привычка '{habit_name}' создана для пользователя {message.from_user.id}.")
 
     except APIClientError as exc:
-        await processing_msg.delete()
         log.error(f"Ошибка при сохранении привычки для {message.from_user.id}: {exc}")
-
         await message.answer(
             "❌ <b>Произошла ошибка при сохранении.</b>\nПожалуйста, попробуйте еще раз позже.",
             reply_markup=get_main_menu_keyboard(),
         )
+
     finally:
+        # Удаляем сообщение "Сохраняю...", если оно еще есть
+        with suppress(Exception):
+            await processing_msg.delete()
+
         # В любом случае (успех или ошибка) сбрасываем состояние FSM
         # Чтобы пользователь не "застрял" в диалоге
         await state.clear()
