@@ -60,6 +60,7 @@ class HabitSchemaRead(HabitSchemaBase):
     max_streak: int = Field(..., description="Максимальная достигнутая непрерывная серия выполнений")
     created_at: datetime = Field(..., description="Время создания привычки")
     updated_at: datetime = Field(..., description="Время последнего обновления привычки")
+    is_done_today: bool = Field(False, description="Флаг: выполнена ли привычка сегодня (вычисляется сервером)")
 
 
 class HabitSchemaReadWithExecutions(HabitSchemaRead):
