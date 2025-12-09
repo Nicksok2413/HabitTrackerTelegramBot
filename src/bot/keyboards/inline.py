@@ -52,12 +52,12 @@ def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: 
 
     # Генерируем кнопки для каждой привычки
     for habit in habits:
-        # Визуальная индикация: огонек, если есть стрик > 0
+        # Иконка стрика: огонек, если есть стрик > 0
         streak_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
-        button_text = f"{streak_icon} {habit['name']}"
+        # Иконка статуса на сегодня
+        status_icon = "✅" if habit.get("is_done_today", False) else "⬜"
 
-        # status_icon = "✅" if habit.execution.get("status", "pending") == "done" else "⬜"
-        # button_text = f"{streak_icon} {habit['name']} {status_icon}"
+        button_text = f"{streak_icon} {habit['name']} {status_icon}"
 
         # При нажатии передаем ID и действие 'view'
         builder.button(text=button_text, callback_data=HabitDetailCallback(habit_id=habit["id"], page=page))
