@@ -10,7 +10,7 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.bot.core.enums import HabitAction, ProfileAction, IGNORE_CALLBACK
+from src.bot.core.enums import IGNORE_CALLBACK, HabitAction, ProfileAction
 from src.bot.keyboards.callbacks import (
     HabitActionCallback,
     HabitDetailCallback,
