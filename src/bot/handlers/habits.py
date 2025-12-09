@@ -722,8 +722,16 @@ async def _save_habit_change(
         **changes
 ) -> None:
     """
-    Отправляет изменения в API и возвращает пользователя к просмотру привычки.
+    Отправляет изменения привычки в API и возвращает пользователя к карточке привычки.
+
+    Args:
+        message (Message): Объект сообщения Telegram.
+        state (FSMContext): Контекст машины состояний.
+        api_client (HabitTrackerClient): Инъекция клиента API.
     """
+    if not message.from_user:
+        return
+
     data = await state.get_data()
     habit_id = data["habit_id"]
     page = data.get("page", 0)
@@ -733,24 +741,25 @@ async def _save_habit_change(
         await api_client.update_habit(message.from_user, habit_id, **changes)
         await message.answer("✅ Изменения сохранены.")
 
-        # Очищаем состояние
-        await state.clear()
-
-        # Показываем обновленную карточку привычки
+        # Показываем обновленную карточку привычки (новым сообщением)
         habit = await api_client.get_habit_details(message.from_user, habit_id)
 
         # Определяем статус на сегодня
         is_done = _is_done_today(habit)
 
-        keyboard = get_habit_detail_keyboard(habit_id=habit_id, page=page, is_done_today=is_done)
-
         # Формируем красивый текст
         text = _format_habit_text(habit=habit, is_done_today=is_done)
+
+        # Клавиатура с кнопками действий
+        keyboard = get_habit_detail_keyboard(habit_id=habit_id, page=page, is_done_today=is_done)
 
         await message.answer(text, reply_markup=keyboard)
 
     except APIClientError:
         await message.answer("❌ Ошибка при сохранении.")
+    finally:
+        # В любом случае (успех или ошибка) сбрасываем состояние FSM
+        # Чтобы пользователь не "застрял" в диалоге
         await state.clear()
 
 # Открытие меню редактирования
@@ -796,22 +805,24 @@ async def start_editing_field(
 
     if action == HabitAction.EDIT_NAME:
         text = "Введите новое <b>название</b> привычки:"
-        await state.set_state(HabitEditing.waiting_for_new_name)
+        new_state = HabitEditing.waiting_for_new_name
 
     elif action == HabitAction.EDIT_DESC:
         text = "Введите новое <b>описание</b> (или /empty для удаления):"
-        await state.set_state(HabitEditing.waiting_for_new_description)
+        new_state = HabitEditing.waiting_for_new_description
 
     elif action == HabitAction.EDIT_DAYS:
         text = "Введите новую <b>цель</b> (количество дней):"
-        await state.set_state(HabitEditing.waiting_for_new_target_days)
+        new_state = HabitEditing.waiting_for_new_target_days
 
     elif action == HabitAction.EDIT_TIME:
         text = "Введите новое <b>время</b> напоминания (ЧЧ:ММ):"
-        await state.set_state(HabitEditing.waiting_for_new_time)
+        new_state = HabitEditing.waiting_for_new_time
 
     else:
         return
+
+    await state.set_state(new_state)
 
     # Приглашаем пользователя ко вводу
     await callback.message.edit_text(text)
@@ -821,7 +832,7 @@ async def start_editing_field(
 
 # Обработка ввода нового названия привычки
 @router.message(HabitEditing.waiting_for_new_name)
-async def process_new_name(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+async def process_new_name(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
 
     if not message.text:
         return await message.answer("Отправьте текст.")
@@ -841,12 +852,24 @@ async def process_new_desc(message: Message, state: FSMContext, api_client: Habi
     if not message.text:
         return await message.answer("Отправьте текст.")
 
-    new_desc = message.text.strip()
+    new_description = message.text.strip()
 
-    if new_desc == "/empty":
-        new_desc = None
+    if new_description == "/empty":
+        new_description = None
 
-    await _save_habit_change(message, state, api_client, description=new_desc)
+    await _save_habit_change(message, state, api_client, description=new_description)
+
+
+# Обработка ввода новой цели (количества дней) привычки
+@router.message(HabitEditing.waiting_for_new_target_days)
+async def process_new_days(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+
+    if not message.text or not message.text.isdigit() or int(message.text) < 1:
+        return await message.answer("Введите натуральное число.")
+
+    new_target_days = int(message.text)
+
+    await _save_habit_change(message, state, api_client, target_days=new_target_days)
 
 
 # Обработка ввода нового времени оповещения
@@ -856,25 +879,11 @@ async def process_new_time(message: Message, state: FSMContext, api_client: Habi
     if not message.text:
         return await message.answer("Отправьте время ЧЧ:ММ.")
 
-    time_str = message.text.strip()
+    new_time_to_remind_str = message.text.strip()
 
     # Простейшая валидация (лучше regex как при создании)
-    if ":" not in time_str:
+    if ":" not in new_time_to_remind_str:
         return await message.answer("Формат должен быть ЧЧ:ММ (например, 09:00).")
 
-    await _save_habit_change(message, state, api_client, time_to_remind=time_str)
+    await _save_habit_change(message, state, api_client, time_to_remind=new_time_to_remind_str)
 
-
-# Обработка ввода новой цели (количества дней) привычки
-@router.message(HabitEditing.waiting_for_new_target_days)
-async def process_new_days(message: Message, state: FSMContext, api_client: HabitTrackerClient):
-
-    if not message.text or not message.text.isdigit():
-        return await message.answer("Введите число.")
-
-    days = int(message.text)
-
-    if days < 1:
-        return await message.answer("Число должно быть > 0.")
-
-    await _save_habit_change(message, state, api_client, target_days=days)
