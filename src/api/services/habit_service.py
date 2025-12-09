@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.core.exceptions import ForbiddenException, NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Habit, User
-from src.api.repositories import HabitRepository
-from src.api.schemas import HabitSchemaCreate, HabitSchemaUpdate
+from src.api.repositories import HabitExecutionRepository, HabitRepository
+from src.api.schemas import HabitSchemaCreate, HabitSchemaRead, HabitSchemaUpdate
+from src.api.utils import get_today_date_for_user
 
 from .base_service import BaseService
 
@@ -20,14 +21,16 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
     Отвечает за создание, чтение, обновление и удаление записей о привычках.
     """
 
-    def __init__(self, habit_repository: HabitRepository):
+    def __init__(self, habit_repository: HabitRepository, execution_repository: HabitExecutionRepository):
         """
         Инициализирует сервис для репозитория HabitRepository.
 
         Args:
             habit_repository (HabitRepository): Репозиторий для работы с привычками.
+            execution_repository (HabitExecutionRepository): Репозиторий для работы с выполнениями привычек.
         """
         super().__init__(repository=habit_repository)
+        self.execution_repository = execution_repository
 
     async def get_habit_by_id_for_user(self, db_session: AsyncSession, *, habit_id: int, current_user: User) -> Habit:
         """
@@ -106,9 +109,9 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
         skip: int = 0,
         limit: int = 100,
         active_only: bool = False,
-    ) -> Sequence[Habit]:
+    ) -> Sequence[HabitSchemaRead]:
         """
-        Получает список привычек для текущего пользователя с пагинацией.
+        Получает список привычек для текущего пользователя с  флагом выполнения на сегодня.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
@@ -118,20 +121,51 @@ class HabitService(BaseService[Habit, HabitRepository, HabitSchemaCreate, HabitS
             active_only (bool): Если True, возвращает только активные привычки.
 
         Returns:
-            Sequence[Habit]: Список привычек пользователя.
+            Sequence[HabitSchemaRead]: Список схем привычек пользователя.
         """
         log.debug(
             f"Получение привычек для пользователя (ID {current_user.id}). "
             f"(skip={skip}, limit={limit}, active_only={active_only})"
         )
 
-        return await self.repository.get_habits_by_user_id(
+        habits = await self.repository.get_habits_by_user_id(
             db_session,
             user_id=current_user.id,
             skip=skip,
             limit=limit,
             active_only=active_only,
         )
+
+        if not habits:
+            return []
+
+        # Определяем дату "сегодня" для пользователя
+        today = get_today_date_for_user(current_user)
+
+        # Собираем ID найденных привычек
+        habit_ids = [habit.id for habit in habits]
+
+        # Получаем ID выполненных сегодня привычек
+        done_ids = await self.execution_repository.get_done_habit_ids_for_date(
+            db_session,
+            habit_ids=habit_ids,
+            check_date=today
+        )
+
+        # Собираем итоговый список схем
+        result = []
+
+        for habit in habits:
+            # Превращаем ORM модель в Pydantic схему
+            schema = HabitSchemaRead.model_validate(habit)
+
+            # Проставляем флаг (set - поиск O(1))
+            schema.is_done_today = habit.id in done_ids
+
+            result.append(schema)
+
+        # Возвращаем список схем привычек
+        return result
 
     async def create_habit_for_user(
         self,
