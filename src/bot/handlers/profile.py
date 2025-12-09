@@ -2,6 +2,7 @@
 Обработчики раздела "Профиль".
 """
 
+from contextlib import suppress
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import F, Router
@@ -47,7 +48,6 @@ async def show_profile(message: Message, api_client: HabitTrackerClient) -> None
         last_name = f"<i>{user_data['last_name']}</i>" if user_data.get("last_name") else "🤷🏻‍♂️"
         timezone = user_data.get("timezone", "UTC")
 
-        # Формируем текст
         text = (
             f"👤 <b>Ваш профиль</b>\n\n"
             f"🆔 Telegram ID: <code>{user_data['telegram_id']}</code>\n"
@@ -122,18 +122,15 @@ async def process_timezone_input(message: Message, state: FSMContext, api_client
         )
         return
 
-    # Сохранение через API
     if not message.from_user:
         return
 
+    # Если валидация прошла, начинаем процесс сохранения
     processing_msg = await message.answer("⏳ Сохраняю настройки...")
 
     try:
         # Отправляем запрос к API
         await api_client.update_users_timezone(message.from_user, timezone=new_timezone)
-
-        # Удаляем сообщение "Сохраняю..."
-        await processing_msg.delete()
 
         await message.answer(
             f"✅ Часовой пояс успешно изменен на <b>{new_timezone}</b>.\nНапоминания будут приходить вовремя!",
@@ -142,13 +139,16 @@ async def process_timezone_input(message: Message, state: FSMContext, api_client
         log.info(f"Часовой пояс успешно изменен на {new_timezone} для пользователя {message.from_user.id}.")
 
     except APIClientError as exc:
-        await processing_msg.delete()
         log.error(f"Ошибка при обновлении профиля для {message.from_user.id}: {exc}")
-
         await message.answer(
             "❌ Ошибка при обновлении профиля на сервере. Попробуйте позже.", reply_markup=get_profile_keyboard()
         )
+
     finally:
+        # Удаляем сообщение "Сохраняю...", если оно еще есть
+        with suppress(Exception):
+            await processing_msg.delete()
+
         # В любом случае (успех или ошибка) сбрасываем состояние FSM
         # Чтобы пользователь не "застрял" в диалоге
         await state.clear()
