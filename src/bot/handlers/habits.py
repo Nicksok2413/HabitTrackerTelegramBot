@@ -20,15 +20,20 @@ from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from aiogram.types import User as TelegramUser
 
 from src.bot.core.enums import HabitAction
-from src.bot.keyboards.callbacks import HabitActionCallback, HabitDetailCallback, HabitsNavigationCallback
+from src.bot.keyboards.callbacks import (
+    HabitActionCallback,
+    HabitDetailCallback,
+    HabitsNavigationCallback,
+)
 from src.bot.keyboards.inline import (
     get_habit_delete_confirmation_keyboard,
     get_habit_detail_keyboard,
+    get_habit_edit_menu_keyboard,
     get_habits_list_keyboard,
 )
 from src.bot.keyboards.reply import BTN_CREATE_HABIT, BTN_MY_HABITS, get_main_menu_keyboard
 from src.bot.services.api_client import APIClientError, HabitTrackerClient
-from src.bot.states.habit_states import HabitCreation
+from src.bot.states.habit_states import HabitCreation, HabitEditing
 from src.core_shared.logging_setup import setup_logger
 
 # Настраиваем логгер
@@ -208,6 +213,47 @@ def _is_done_today(habit_details: dict) -> bool:
     return False
 
 
+def _format_habit_text(
+        habit: dict,
+        is_done_today: bool,
+        is_new_habit: bool = False,
+) -> str:
+    """
+    Вспомогательная функция для формирования красивого текста сообщения.
+
+    Если создается новая привычка, формирует соответствующий текст сообщения.
+
+    Args:
+        habit (dict): Словарь с данными привычки.
+        is_done_today (bool): Флаг, определяющий статус выполнения привычки на сегодня.
+        is_new_habit (bool): Флаг, определяющий была и создана новая привычка (по умолчанию - False).
+
+    Returns:
+        str: Красивый текст для сообщения.
+    """
+
+    status_text = "✅ <b>Выполнено сегодня</b>" if is_done_today else "⏳ <b>Ждет выполнения</b>"
+    habit_description_text = f"📝 <i>{habit['description']}</i>" if habit.get("description") else ""
+    formatted_time = habit["time_to_remind"][:5]  # API возвращает "ЧЧ:ММ:СС", берем первые 5 символов "ЧЧ:ММ"
+
+    last_line = "Удачи в достижении цели! 💪" if is_new_habit else status_text
+
+    text = (
+        f"📌 <b>{habit['name']}</b>\n\n"
+        f"{habit_description_text}\n\n"
+        f"🔥 Стрик: <b>{habit['current_streak']} дн.</b> (Рекорд: {habit['max_streak']})\n"
+        f"⏰ Напоминание: {formatted_time}\n"
+        f"📅 Цель: {habit['target_days']} дн.\n"
+        f"──────────────────\n"
+        f"{last_line}"
+    )
+
+    if is_new_habit:
+        text = "🎉 <b>Привычка успешно создана!</b>\n\n" + text
+
+    return text
+
+
 async def _render_habit_details(
     callback: CallbackQuery,
     habit_id: int,
@@ -241,21 +287,9 @@ async def _render_habit_details(
 
         # Определяем статус на сегодня
         is_done = _is_done_today(habit)
-        status_text = "✅ <b>Выполнено сегодня</b>" if is_done else "⏳ <b>Ждет выполнения</b>"
 
         # Формируем красивый текст
-        habit_description_text = f"\n<i>{habit['description']}</i>" if habit.get("description") else ""
-        formatted_time = habit["time_to_remind"][:5]  # API возвращает "ЧЧ:ММ:СС", берем первые 5 символов "ЧЧ:ММ"
-
-        text = (
-            f"📝 <b>{habit['name']}</b>\n"
-            f"{habit_description_text}\n\n"
-            f"🔥 Стрик: <b>{habit['current_streak']} дн.</b> (Рекорд: {habit['max_streak']})\n"
-            f"⏰ Напоминание: {formatted_time}\n"
-            f"📅 Цель: {habit['target_days']} дн.\n"
-            f"──────────────────\n"
-            f"{status_text}"
-        )
+        text = _format_habit_text(habit=habit, is_done_today=is_done)
 
         # Клавиатура с кнопками действий (выполнить, отменить выполнение, удалить и назад)
         keyboard = get_habit_detail_keyboard(
@@ -355,6 +389,174 @@ async def toggle_habit_status(
     except APIClientError:
         with suppress(Exception):
             await callback.answer("Ошибка при обновлении статуса привычки.", show_alert=True)
+
+
+# --- Логика редактирования привычки ---
+
+
+async def _save_habit_change(
+        message: Message,
+        state: FSMContext,
+        api_client: HabitTrackerClient,
+        **changes
+):
+    """
+    Отправляет изменения в API и возвращает пользователя к просмотру привычки.
+    """
+    data = await state.get_data()
+    habit_id = data["habit_id"]
+    page = data.get("page", 0)
+
+    try:
+        # Отправляем запрос к API
+        await api_client.update_habit(message.from_user, habit_id, **changes)
+        await message.answer("✅ Изменения сохранены.")
+
+        # Очищаем состояние
+        await state.clear()
+
+        # Показываем обновленную карточку привычки
+        habit = await api_client.get_habit_details(message.from_user, habit_id)
+
+        # Определяем статус на сегодня
+        is_done = _is_done_today(habit)
+
+        keyboard = get_habit_detail_keyboard(habit_id=habit_id, page=page, is_done_today=is_done)
+
+        # Формируем красивый текст
+        text = _format_habit_text(habit=habit, is_done_today=is_done)
+
+        await message.answer(text, reply_markup=keyboard)
+
+    except APIClientError:
+        await message.answer("❌ Ошибка при сохранении.")
+        await state.clear()
+
+# Открытие меню редактирования
+@router.callback_query(HabitActionCallback.filter(F.action == HabitAction.OPEN_EDIT_MENU))
+async def open_edit_menu(
+        callback: CallbackQuery, callback_data: HabitActionCallback
+) -> None:
+    """
+    Показывает меню выбора поля для редактирования.
+
+    Args:
+        callback (CallbackQuery): Объект колбэка от кнопки 'Редактировать'.
+        callback_data (HabitActionCallback): Данные с ID привычки.
+    """
+    await callback.message.edit_text(
+        "✏️ <b>Редактирование привычки</b>\n\nЧто вы хотите изменить?",
+        reply_markup=get_habit_edit_menu_keyboard(habit_id=callback_data.habit_id, page=callback_data.page)
+    )
+
+
+# Начало редактирования конкретного поля (Роутинг по кнопкам)
+@router.callback_query(HabitActionCallback.filter(F.action.in_({
+    HabitAction.EDIT_NAME, HabitAction.EDIT_DESC, HabitAction.EDIT_TIME, HabitAction.EDIT_DAYS
+})))
+async def start_editing_field(
+        callback: CallbackQuery,
+        callback_data: HabitActionCallback,
+        state: FSMContext
+) -> None:
+    """
+    Переводит бота в состояние ожидания ввода для выбранного поля.
+
+    Args:
+        callback (CallbackQuery): Объект колбэка.
+        callback_data (HabitActionCallback): Данные с ID привычки.
+        state (FSMContext): Контекст машины состояний.
+    """
+
+    # Сохраняем контекст (ID привычки и страницу списка), чтобы потом вернуться
+    await state.update_data(habit_id=callback_data.habit_id, page=callback_data.page)
+
+    action = callback_data.action
+
+    if action == HabitAction.EDIT_NAME:
+        text = "Введите новое <b>название</b> привычки:"
+        await state.set_state(HabitEditing.waiting_for_new_name)
+
+    elif action == HabitAction.EDIT_DESC:
+        text = "Введите новое <b>описание</b> (или /empty для удаления):"
+        await state.set_state(HabitEditing.waiting_for_new_description)
+
+    elif action == HabitAction.EDIT_DAYS:
+        text = "Введите новую <b>цель</b> (количество дней):"
+        await state.set_state(HabitEditing.waiting_for_new_target_days)
+
+    elif action == HabitAction.EDIT_TIME:
+        text = "Введите новое <b>время</b> напоминания (ЧЧ:ММ):"
+        await state.set_state(HabitEditing.waiting_for_new_time)
+
+    else:
+        return
+
+    # Приглашаем пользователя ко вводу
+    await callback.message.edit_text(text)
+
+    await callback.answer()
+
+
+# Обработка ввода нового названия привычки
+@router.message(HabitEditing.waiting_for_new_name)
+async def process_new_name(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+
+    if not message.text:
+        return await message.answer("Отправьте текст.")
+
+    new_name = message.text.strip()
+
+    if len(new_name) > 100:
+        return await message.answer("Слишком длинное название.")
+
+    await _save_habit_change(message, state, api_client, name=new_name)
+
+
+# Обработка ввода нового описания привычки
+@router.message(HabitEditing.waiting_for_new_description)
+async def process_new_desc(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+
+    if not message.text:
+        return await message.answer("Отправьте текст.")
+
+    new_desc = message.text.strip()
+
+    if new_desc == "/empty":
+        new_desc = None
+
+    await _save_habit_change(message, state, api_client, description=new_desc)
+
+
+# Обработка ввода нового времени оповещения
+@router.message(HabitEditing.waiting_for_new_time)
+async def process_new_time(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+
+    if not message.text:
+        return await message.answer("Отправьте время ЧЧ:ММ.")
+
+    time_str = message.text.strip()
+
+    # Простейшая валидация (лучше regex как при создании)
+    if ":" not in time_str:
+        return await message.answer("Формат должен быть ЧЧ:ММ (например, 09:00).")
+
+    await _save_habit_change(message, state, api_client, time_to_remind=time_str)
+
+
+# Обработка ввода новой цели (количества дней) привычки
+@router.message(HabitEditing.waiting_for_new_target_days)
+async def process_new_days(message: Message, state: FSMContext, api_client: HabitTrackerClient):
+
+    if not message.text or not message.text.isdigit():
+        return await message.answer("Введите число.")
+
+    days = int(message.text)
+
+    if days < 1:
+        return await message.answer("Число должно быть > 0.")
+
+    await _save_habit_change(message, state, api_client, target_days=days)
 
 
 # --- Логика удаления привычки ---
@@ -646,15 +848,10 @@ async def process_habit_time(message: Message, state: FSMContext, api_client: Ha
         await processing_msg.delete()
 
         # Формируем красивый ответ
-        habit_description_text = f"\n<i>{new_habit['description']}</i>" if new_habit.get("description") else ""
-        formatted_time = new_habit["time_to_remind"][:5]  # API возвращает "ЧЧ:ММ:СС", берем первые 5 символов "ЧЧ:ММ"
+        text = _format_habit_text(habit=new_habit, is_done_today=False, is_new_habit=True)
 
         await message.answer(
-            f"🎉 <b>Привычка успешно создана!</b>\n\n"
-            f"📌 <b>{new_habit['name']}</b>{habit_description_text}\n"
-            f"⏰ Напоминание в: <b>{formatted_time}</b>\n"
-            f"📅 Цель: <b>{new_habit['target_days']} дн.</b>\n\n"
-            f"Удачи в достижении цели! 💪",
+            text=text,
             reply_markup=get_main_menu_keyboard(),  # Возвращаем главное меню
         )
         log.info(f"Привычка '{habit_name}' создана для пользователя {message.from_user.id}.")

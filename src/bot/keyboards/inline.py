@@ -94,7 +94,7 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     """
     Генерирует клавиатуру для детального просмотра привычки.
 
-    Включает кнопки действий (выполнить, отменить выполнение, удалить) и навигации (назад).
+    Включает кнопки действий (выполнить, отменить выполнение, редактировать, удалить) и навигации (назад).
 
     Args:
         habit_id (int): ID привычки.
@@ -120,6 +120,12 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
             callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.SET_PENDING),
         )
 
+    # Кнопка меню редактирования привычки
+    builder.button(
+        text="✏️ Редактировать",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.OPEN_EDIT_MENU)
+    )
+
     # Кнопка удаления
     builder.button(
         text="🗑 Удалить",
@@ -131,6 +137,39 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
     builder.adjust(1)
+
+    return builder.as_markup()
+
+
+def get_habit_edit_menu_keyboard(habit_id: int, page: int) -> InlineKeyboardMarkup:
+    """
+    Клавиатура выбора поля для редактирования.
+
+    Args:
+        habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="📝 Название",
+                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_NAME))
+    builder.button(text="📄 Описание",
+                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DESC))
+    builder.button(text="📅 Цель (дни)",
+                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DAYS))
+    builder.button(text="⏰ Время",
+                   callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_TIME))
+
+    builder.button(
+        text="🔙 Назад к привычке",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW)
+    )
+
+    # Настраиваем макет: по 2 кнопки в ряд, последняя одна
+    builder.adjust(2, 2, 1)
 
     return builder.as_markup()
 
