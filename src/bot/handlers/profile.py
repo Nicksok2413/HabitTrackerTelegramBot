@@ -101,7 +101,7 @@ async def process_timezone_input(message: Message, state: FSMContext, api_client
     Args:
         message (Message): Объект сообщения Telegram.
         state (FSMContext): Контекст машины состояний.
-        api_client (HabitTrackerClient): Инъекция клиента API.
+        api_client (HabitTrackerClient): Клиент API.
     """
     if not message.text:
         await message.answer("⚠️ Пожалуйста, отправьте название часового пояса текстом.")
