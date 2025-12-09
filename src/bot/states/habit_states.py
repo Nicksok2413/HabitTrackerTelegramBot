@@ -27,10 +27,10 @@ class HabitEditing(StatesGroup):
     Группа состояний для редактирования привычки.
 
     Состояния при нажатии определенных кнопок (Menu-based editing):
-    - waiting_for_name: Ожидание ввода нового названия привычки или команды пропуска - /skip.
-    - waiting_for_description: Ожидание ввода нового описания или команды пропуска - /skip.
-    - waiting_for_target_days: Ожидание ввода новой цели - количества дней или команды пропуска - /skip.
-    - waiting_for_time: Ожидание ввода нового времени напоминания (ЧЧ:ММ) или команды пропуска - /skip.
+    - waiting_for_name: Ожидание ввода нового названия привычки.
+    - waiting_for_description: Ожидание ввода нового описания или команды удаления описания - /empty.
+    - waiting_for_target_days: Ожидание ввода новой цели.
+    - waiting_for_time: Ожидание ввода нового времени напоминания (ЧЧ:ММ).
     """
     waiting_for_new_name = State()
     waiting_for_new_description = State()
