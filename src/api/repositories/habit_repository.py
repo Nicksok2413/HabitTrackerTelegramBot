@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.api.core.config import settings  # Для значения target_days по умолчанию
 from src.api.core.logging import api_log as log
-from src.api.models import Habit, User
+from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
 from src.api.repositories import BaseRepository
 from src.api.schemas import HabitSchemaCreate, HabitSchemaUpdate
 
@@ -159,8 +159,9 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
 
     async def get_habits_needing_notification(self, db_session: AsyncSession) -> Sequence[Habit]:
         """
-        Находит активные привычки, время напоминания которых совпадает
-        с текущим временем в часовом поясе пользователя.
+        Находит активные привычки для напоминания, которые еще не были выполнены сегодня.
+
+        Время напоминания привычек совпадает с текущим временем в часовом поясе пользователя.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
@@ -170,16 +171,21 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         """
         # Конвертируем UTC время сервера в локальное время пользователя, используя его timezone
 
-        # Функция `date_trunc('minute', ...)` специфична для PostgreSQL
-        # Она округляет время до заданной точности (отбрасываем секунды, чтобы сравнивать только ЧЧ:ММ)
-
         # Функция `timezone(zone_name, timestamp)` специфична для PostgreSQL
         # Она конвертирует время из одной зоны в другую внутри SQL-запроса
 
-        # Синтаксис `::time` специфичен для PostgreSQL
-        # В стандарте SQL это CAST(... AS TIME)
+        # SQL-выражение для текущей даты пользователя
+        user_current_date = text("timezone(users.timezone, now())::date")
 
-        # Этот запрос
+        # Подзапрос: существует ли запись 'DONE' для этой привычки на "сегодня" (по времени юзера)
+        has_done_execution_today = select(1).where(
+            HabitExecution.habit_id == self.model.id,
+            HabitExecution.status == HabitExecutionStatus.DONE,
+            HabitExecution.execution_date == user_current_date
+        ).exists()
+
+        # Функция `date_trunc('minute', ...)` специфична для PostgreSQL
+        # Она округляет время до заданной точности (отбрасываем секунды, чтобы сравнивать только ЧЧ:ММ)
         statement = (
             select(self.model)
             .join(self.model.user)
@@ -187,10 +193,14 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
                 self.model.is_active.is_(True),
                 self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
                 self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
-                # Сравниваем время:
+
+                # Сравниваем время (минута в минуту)
                 text(
                     "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)"
                 ),
+
+                # Исключаем те, что уже выполнены сегодня (has_done_execution_today == True)
+                ~has_done_execution_today
             )
         )
 
@@ -200,9 +210,3 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         result = await db_session.execute(statement)
 
         return result.scalars().all()
-
-
-# Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
-# для использования планировщиком, если планировщик будет обращаться к API,
-# либо если логика планировщика будет в API сервисе.
-# Если планировщик работает напрямую с БД, такие методы в API репозитории не понадобятся.

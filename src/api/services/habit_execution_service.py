@@ -339,6 +339,12 @@ class HabitExecutionService(
         if streaks_were_updated:
             db_session.add(habit)
 
+            # Проверяем, достигнута ли цель
+            if habit.current_streak >= habit.target_days:
+                # Если цель достигнута, деактивируем привычку
+                habit.is_active = False
+                log.info(f"Привычка {habit.id} достигла цели ({habit.target_days} дн.) и переведена в архив.")
+
         try:
             # Фиксируем транзакцию (бизнес-операция завершена успешно)
             await db_session.commit()
