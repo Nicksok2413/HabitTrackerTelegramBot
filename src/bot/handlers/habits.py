@@ -388,18 +388,35 @@ async def toggle_habit_status(
     try:
         # Отправляем запрос в API
         await api_client.change_habit_status(callback.from_user, callback_data.habit_id, status=target_status)
-
         # Показываем уведомление
         text = "🎉 Супер! Привычка выполнена!" if target_status == "done" else "↩️ Выполнение отменено."
         await callback.answer(text)
 
-        # Перерисовываем карточку привычки, чтобы показать актуальный статус и стрик
-        await _render_habit_details(
-            callback=callback,
-            habit_id=callback_data.habit_id,
-            page=callback_data.page,
-            api_client=api_client,
+        # После изменения статуса, получаем свежие данные о привычке
+        updated_habit = await api_client.get_habit_details(callback.from_user, callback_data.habit_id)
+
+        # Проверяем достигнута ли цель
+        is_completed_now = (
+                updated_habit["current_streak"] >= updated_habit["target_days"]
+                and not updated_habit["is_active"]  # Она должна стать неактивной
         )
+
+        # Если цель достигнута, показываем уведомление
+        if is_completed_now:
+            await callback.message.edit_text(
+                f"🏆 <b>ПОЗДРАВЛЯЕМ!</b> 🏆\n\n"
+                f"Вы успешно закрепили привычку <b>{updated_habit['name']}</b>!\n"
+                f"Вы продержались {updated_habit['target_days']} дней подряд.\n\n"
+                f"Привычка перенесена в архив. Вы всегда можете активировать её снова через меню редактирования."
+            )
+        else:
+            # Если нет - перерисовываем карточку привычки, чтобы показать актуальный статус и стрик
+            await _render_habit_details(
+                callback=callback,
+                habit_id=callback_data.habit_id,
+                page=callback_data.page,
+                api_client=api_client,
+            )
 
     except APIClientError:
         with suppress(Exception):
