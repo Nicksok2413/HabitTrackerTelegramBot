@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.api.core.config import settings  # Для значения target_days по умолчанию
 from src.api.core.logging import api_log as log
-from src.api.models import Habit
+from src.api.models import Habit, User
 from src.api.repositories import BaseRepository
 from src.api.schemas import HabitSchemaCreate, HabitSchemaUpdate
 
@@ -168,20 +168,23 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         Returns:
             Sequence[Habit]: Список привычек пользователя, о выполнении которых нужно напомнить.
         """
-        # Мы используем SQL выражение для конвертации UTC времени сервера
-        # в локальное время пользователя, используя его timezone.
-        # CAST(... AS TIME) отбрасывает дату, оставляя только время.
-        # date_trunc('minute', ...) отбрасывает секунды, чтобы сравнивать только ЧЧ:ММ.
+        # Конвертируем UTC время сервера в локальное время пользователя, используя его timezone
 
-        # ВАЖНО: Этот запрос специфичен для PostgreSQL.
+        # Функция `date_trunc('minute', ...)` специфична для PostgreSQL
+        # Она округляет время до заданной точности (отбрасываем секунды, чтобы сравнивать только ЧЧ:ММ)
+
+        # Функция `timezone(zone_name, timestamp)` специфична для PostgreSQL
+        # Она конвертирует время из одной зоны в другую внутри SQL-запроса
+
+        # Синтаксис `::time` специфичен для PostgreSQL
+        # В стандарте SQL это CAST(... AS TIME)
+
+        # Этот запрос
         statement = select(self.model).join(self.model.user).where(
             self.model.is_active.is_(True),
             self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
             self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
-
             # Сравниваем время:
-            # habit.time_to_remind == (NOW() at time zone user.timezone)::time
-            # Мы округляем до минут, чтобы не пропустить секунды.
             text(
                 "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)")
         )
@@ -190,6 +193,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         statement = statement.options(selectinload(self.model.user))
 
         result = await db_session.execute(statement)
+
         return result.scalars().all()
 
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
