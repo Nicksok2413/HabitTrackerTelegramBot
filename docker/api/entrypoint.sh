@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # ==============================================================================
-# Entrypoint-скрипт для API-контейнера
-# Выполняет команды, необходимые перед запуском основного процесса
+# Универсальный Entrypoint-скрипт для Backend-сервисов (API, Scheduler, Migrations)
+# Выполняет команды, необходимые перед запуском основных процессов
 # ==============================================================================
 
 # Выход при ошибке (fail fast)
@@ -10,7 +10,7 @@ set -e
 
 # Функция для проверки готовности БД
 wait_for_db() {
-    echo "-> (API Entrypoint) Ожидание запуска PostgreSQL..."
+    echo "-> (Entrypoint) Ожидание запуска PostgreSQL..."
     /app/.venv/bin/python << END
 import os
 import psycopg
@@ -40,16 +40,16 @@ try:
             time.sleep(1)
 
     if conn is None:
-        print("-> (API Entrypoint) Не удалось подключиться к PostgreSQL после 30 секунд.")
+        print("-> (Entrypoint) Не удалось подключиться к PostgreSQL после 30 секунд.")
         sys.exit(1)
 
     conn.close()
 
 except KeyError as exc:
-    print(f"-> (API Entrypoint) Ошибка: переменная окружения {exc} не установлена.")
+    print(f"-> (Entrypoint) Ошибка: переменная окружения {exc} не установлена.")
     sys.exit(1)
 except Exception as exc:
-    print(f"-> (API Entrypoint) Произошла ошибка при проверке БД (psycopg3): {exc}")
+    print(f"-> (Entrypoint) Произошла ошибка при проверке БД (psycopg3): {exc}")
     sys.exit(1)
 END
 }
@@ -66,9 +66,9 @@ APP_GROUP=appgroup
 # Используем chown для изменения владельца точки монтирования тома
 # Делаем это под root перед понижением привилегий
 if [ -d "/logs" ]; then
-    echo "-> (API Entrypoint) Выдача прав на /logs..."
+    echo "-> (Entrypoint) Выдача прав на /logs..."
     chown -R "${APP_USER}:${APP_GROUP}" /logs
-    echo "-> (API Entrypoint) Права установлены."
+    echo "-> (Entrypoint) Права установлены."
 fi
 
 
@@ -76,15 +76,19 @@ fi
 case "$@" in
   # Если в команде встречается слово "uvicorn", запускаем веб-сервер
   *"uvicorn"*)
-    echo "-> (API Entrypoint) Запуск основного приложения Uvicorn..."
+    echo "-> (Entrypoint: API) Запуск основного приложения Uvicorn..."
     ;;
-  # # Если в команде встречается слово "alembic", работаем с миграциями
+  # Если в команде встречается слово "alembic", работаем с миграциями
   *"alembic"*)
-    echo "-> (API Entrypoint) Выполнение команды Alembic: $@"
+    echo "-> (Entrypoint: Alembic) Выполнение команды Alembic: $@"
+    ;;
+  # Если в команде встречается слово "scheduler", запускаем планировщик
+  *"scheduler"*)
+    echo "-> (Entrypoint: Scheduler) Запуск планировщика: $@"
     ;;
   # "*" - любой другой случай (например, запуск `bash` для отладки)
   *)
-    echo "-> (API Entrypoint) Запуск переданной команды: $@"
+    echo "-> (Entrypoint) Запуск переданной команды: $@"
     ;;
 esac
 
