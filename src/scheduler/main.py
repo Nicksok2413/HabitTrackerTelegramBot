@@ -21,7 +21,7 @@ from src.scheduler.tasks import bot, send_reminders
 log = setup_logger("SchedulerMain", log_level_override=settings.LOG_LEVEL)
 
 
-async def main():
+async def main() -> None:
     """Запуск сервиса планировщика."""
     log.info("⏳ Запуск сервиса планировщика (Scheduler Service)...")
 

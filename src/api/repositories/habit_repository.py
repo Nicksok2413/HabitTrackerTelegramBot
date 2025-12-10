@@ -180,13 +180,18 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         # В стандарте SQL это CAST(... AS TIME)
 
         # Этот запрос
-        statement = select(self.model).join(self.model.user).where(
-            self.model.is_active.is_(True),
-            self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
-            self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
-            # Сравниваем время:
-            text(
-                "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)")
+        statement = (
+            select(self.model)
+            .join(self.model.user)
+            .where(
+                self.model.is_active.is_(True),
+                self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
+                self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
+                # Сравниваем время:
+                text(
+                    "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)"
+                ),
+            )
         )
 
         # Подгружаем пользователя, чтобы знать telegram_id для отправки
@@ -195,6 +200,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         result = await db_session.execute(statement)
 
         return result.scalars().all()
+
 
 # Можно добавить методы для поиска привычек, у которых time_to_remind совпадает с текущим,
 # для использования планировщиком, если планировщик будет обращаться к API,

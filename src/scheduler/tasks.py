@@ -7,7 +7,7 @@
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from src.api.core.database import db
 from src.api.models import Habit, User
@@ -61,9 +61,7 @@ async def send_reminders() -> None:
                 habit_description = f"\n<i>{habit.description}</i>" if habit.description else ""
 
                 notification = (
-                    f"⏰ <b>Напоминание!</b>\n\n"
-                    f"Пора выполнить привычку: <b>{habit.name}</b>"
-                    f"{habit_description}"
+                    f"⏰ <b>Напоминание!</b>\n\nПора выполнить привычку: <b>{habit.name}</b>{habit_description}"
                 )
 
                 try:
@@ -77,11 +75,7 @@ async def send_reminders() -> None:
 
                     # Обновляем флаг is_bot_blocked пользователя, чтобы больше не пытаться отправлять ему уведомления
                     # И не спамить БД запросами
-                    await user_repo.update(
-                        session,
-                        db_obj=user,
-                        obj_in={"is_bot_blocked": True}
-                    )
+                    await user_repo.update(session, db_obj=user, obj_in={"is_bot_blocked": True})
 
                     # Фиксируем изменение статуса пользователя
                     await session.commit()

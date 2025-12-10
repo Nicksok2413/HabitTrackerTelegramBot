@@ -1,9 +1,8 @@
 """Конфигурация планировщика."""
 
-from urllib.parse import quote_plus
-
-from pydantic import Field, computed_field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     """
@@ -29,4 +28,4 @@ class Settings(BaseSettings):
 
 
 # Создаем глобальный экземпляр настроек
-settings = Settings() # type: ignore[call-arg]
+settings = Settings()  # type: ignore[call-arg]
