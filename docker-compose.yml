@@ -56,7 +56,7 @@ services:
   bot:
     build:
       context: .  # Контекст сборки - корень проекта
-      dockerfile: docker/Dockerfile # Путь к общему Dockerfile
+      dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
       target: bot  # Этап №4 'bot'
     container_name: habit_tracker_bot
     # Команда для запуска бота (будет передана в entrypoint как "$@")
@@ -71,22 +71,24 @@ services:
     networks:
       - backend
 
-  # --- Заглушки для будущих сервисов ---
-  # scheduler:
-  #   build:
-  #     context: .  # Контекст сборки - корень проекта
-  #     dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
-  #     target: scheduler
-  #   container_name: habit_tracker_scheduler
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - scheduler_logs:/logs  # Монтируем том для логов
-  #   depends_on:
-  #     - api
-  #   restart: unless-stopped
-  #   networks:
-  #     - backend
+  # Сервис Планировщика
+  scheduler:
+    build:
+      context: .  # Контекст сборки - корень проекта
+      dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
+      target: scheduler  # Этап №5 'scheduler'
+    container_name: habit_tracker_scheduler
+    # Команда для запуска планировщика (будет передана в entrypoint как "$@")
+    command: python src/scheduler/main.py
+    env_file: .env  # Передаем все переменные из .env в контейнер
+    volumes:
+      - scheduler_logs:/logs  # Монтируем том для логов
+    depends_on:
+      db:
+        condition: service_healthy  # Запускаем только после того, как db станет healthy
+    restart: unless-stopped
+    networks:
+      - backend
 
 # Определяем все тома для хранения персистентных данных
 volumes:
@@ -96,8 +98,8 @@ volumes:
     driver: local
   bot_logs:
     driver: local
-#  scheduler_logs:
-#    driver: local
+  scheduler_logs:
+    driver: local
 
 # Определяем общую сеть для всех сервисов.
 # Это обеспечивает изоляцию и позволяет контейнерам общаться друг с другом по именам.

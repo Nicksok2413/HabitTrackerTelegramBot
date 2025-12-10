@@ -125,3 +125,25 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # Дефолтная команда (для самодостаточности контейнера)
 CMD ["python", "src/bot/main.py"]
+
+# ==================================================================================
+# 5. SCHEDULER SERVICE: Финальный образ для Планировщика
+# ==================================================================================
+FROM base-runner AS scheduler
+
+# Копируем entrypoint-скрипт от API (планировщику тоже нужно ждать БД) и устанавливаем ему права на выполнение
+COPY ./docker/api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Копируем код API (планировщик использует модели и репозитории из src.api) и код планировщика
+COPY --chown=appuser:appgroup ./src/api ./src/api
+COPY --chown=appuser:appgroup ./src/scheduler ./src/scheduler
+
+# Меняем владельца рабочей директории на appuser
+RUN chown appuser:appgroup /app
+
+# Устанавливаем скрипт как точку входа (он будет выполнен перед основной командой контейнера)
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Дефолтная команда (для самодостаточности контейнера)
+CMD ["python", "src/scheduler/main.py"]
