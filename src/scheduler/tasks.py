@@ -4,13 +4,16 @@
 Содержит логику отправки напоминаний пользователям о необходимости выполнить привычки.
 """
 
+from collections import defaultdict
+
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from sqlalchemy import select, text, update
 
 from src.api.core.database import db
-from src.api.models import Habit, User
+from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
 from src.api.repositories import HabitRepository, UserRepository
 from src.core_shared.logging_setup import setup_logger
 from src.scheduler.config import settings
@@ -53,16 +56,24 @@ async def send_reminders() -> None:
 
             log.info(f"Найдено {len(habits_to_remind)} привычек для отправки уведомлений.")
 
-            # Итерируемся по привычкам и асинхронно отправляем уведомления
+            # Группируем привычки по пользователю
+            user_habits_map = defaultdict(list)  # Словарь: { user_obj: [habit1, habit2, ...] }
+
+            # Итерируемся по привычкам и добавляем данные в словарь
             for habit in habits_to_remind:
-                user = habit.user
+                if habit.user and habit.user.telegram_id:
+                    user_habits_map[habit.user].append(habit)
+
+            # Итерируемся по словарю и асинхронно отправляем уведомления
+            for user, user_habits in user_habits_map.items():
 
                 # Формируем текст уведомления
-                habit_description = f"\n<i>{habit.description}</i>" if habit.description else ""
+                habits_names = []
 
-                notification = (
-                    f"⏰ <b>Напоминание!</b>\n\nПора выполнить привычку: <b>{habit.name}</b>{habit_description}"
-                )
+                for habit in user_habits:
+                    habits_names.append(f"• <b>{habit.name}</b>")
+
+                notification = "⏰ <b>Напоминание!</b>\nПора выполнить следующие привычки:\n" + "\n".join(habits_names)
 
                 try:
                     # Отправляем уведомление
@@ -90,3 +101,79 @@ async def send_reminders() -> None:
         except Exception as exc:
             # Глобальная ошибка в задаче (например, отвал БД)
             log.error(f"💥 Критическая ошибка в цикле send_reminders: {exc}", exc_info=True)
+
+
+async def daily_maintenance() -> None:
+    """
+    Задача обслуживания: сброс стриков для пропущенных привычек.
+
+    Сбрасывает current_streak в 0 для активных привычек, которые были пропущены вчера.
+    Запускается раз в час, например, в XX:05 (так как часовые пояса разные, "полночь" наступает в разное время).
+
+    Критерии сброса:
+    1. Привычка активна.
+    2. current_streak > 0.
+    3. Нет выполнения (DONE) за "вчера" (по часовому поясу пользователя).
+    """
+    log.info("🧹 Запуск обслуживания (сброс стриков)...")
+
+    async with db.session() as session:
+        # Логика: найти все активные привычки, у которых current_streak > 0,
+        # но нет записи о выполнении за "вчера" (по таймзоне юзера)
+
+        try:
+            # Конвертируем UTC время сервера в локальное время пользователя, используя его timezone
+
+            # Функция `timezone(zone_name, timestamp)` специфична для PostgreSQL
+            # Она конвертирует время из одной зоны в другую внутри SQL-запроса
+
+            # SQL-выражение "Вчерашняя дата" для конкретного пользователя
+            user_yesterday = text("(timezone(users.timezone, now())::date - 1)")
+
+            # Подзапрос: существует ли запись 'DONE' для этой привычки на "вчера" (по времени юзера)
+            has_done_yesterday = select(1).where(
+                HabitExecution.habit_id == Habit.id,
+                HabitExecution.status == HabitExecutionStatus.DONE,
+                HabitExecution.execution_date == user_yesterday
+            ).exists()
+
+            # Находим ID привычек для сброса
+            # Явно джойним User'а, чтобы выражение users.timezone сработало
+            candidates_statement = (
+                select(Habit.id)
+                .join(User)
+                .where(
+                    Habit.is_active.is_(True),
+                    Habit.current_streak > 0,
+                    ~has_done_yesterday  # Если вчера не было выполнения (`~` - отрицание)
+                )
+            )
+
+            result = await session.execute(candidates_statement)
+
+            habit_ids_to_reset = result.scalars().all()
+
+            if habit_ids_to_reset:
+                # Массово обновляем привычки (сбрасываем стрик в 0)
+                update_statement = (
+                    update(Habit)
+                    .where(Habit.id.in_(habit_ids_to_reset))
+                    .values(current_streak=0)
+                )
+
+                await session.execute(update_statement)
+
+                # Фиксируем изменения в базе данных
+                await session.commit()
+
+                log.info(f"📉 Сброшен стрик у {len(habit_ids_to_reset)} пропущенных привычек.")
+
+            else:
+                log.debug("Нет привычек для сброса стрика в этом часе.")
+
+        except Exception as exc:
+            # Логируем ошибку
+            log.error(f"Ошибка при сбросе стриков: {exc}", exc_info=True)
+
+            # Откатываем транзакцию, чтобы сохранить целостность данных
+            await session.rollback()

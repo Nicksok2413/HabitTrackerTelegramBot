@@ -15,7 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 from src.api.core.database import db
 from src.core_shared.logging_setup import setup_logger
 from src.scheduler.config import settings
-from src.scheduler.tasks import bot, send_reminders
+from src.scheduler.tasks import bot, daily_maintenance, send_reminders
 
 # Настраиваем логгер
 log = setup_logger("SchedulerMain", log_level_override=settings.LOG_LEVEL)
@@ -35,13 +35,23 @@ async def main() -> None:
     # Настраиваем планировщик (AsyncIOScheduler работает поверх asyncio event loop)
     scheduler = AsyncIOScheduler()
 
-    # Добавляем задачу
+    # Добавляем задачу отправки уведомлений пользователям
     # CronTrigger(second=0): запускать в начале каждой минуты (XX:XX:00)
     scheduler.add_job(
         send_reminders,
         trigger=CronTrigger(second=0),
         id="send_reminders_job",
         name="Ежеминутная проверка напоминаний о привычках",
+        replace_existing=True,  # Перезаписывать задачу при перезапуске
+    )
+
+    # Добавляем Maintenance-задачу сброса стриков
+    # CronTrigger(minute=5): запускать каждый час в 5-ю минуту (XX:05), чтобы обработать смену суток в любом поясе
+    scheduler.add_job(
+        daily_maintenance,
+        trigger=CronTrigger(minute=5),
+        id="maintenance_job",
+        name="Сброс стриков у привычек, которые были пропущены вчера",
         replace_existing=True,  # Перезаписывать задачу при перезапуске
     )
 
