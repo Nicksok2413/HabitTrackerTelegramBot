@@ -178,11 +178,15 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         user_current_date = text("timezone(users.timezone, now())::date")
 
         # Подзапрос: существует ли запись 'DONE' для этой привычки на "сегодня" (по времени юзера)
-        has_done_execution_today = select(1).where(
-            HabitExecution.habit_id == self.model.id,
-            HabitExecution.status == HabitExecutionStatus.DONE,
-            HabitExecution.execution_date == user_current_date
-        ).exists()
+        has_done_execution_today = (
+            select(1)
+            .where(
+                HabitExecution.habit_id == self.model.id,
+                HabitExecution.status == HabitExecutionStatus.DONE,
+                HabitExecution.execution_date == user_current_date,
+            )
+            .exists()
+        )
 
         # Функция `date_trunc('minute', ...)` специфична для PostgreSQL
         # Она округляет время до заданной точности (отбрасываем секунды, чтобы сравнивать только ЧЧ:ММ)
@@ -193,14 +197,12 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
                 self.model.is_active.is_(True),
                 self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
                 self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
-
                 # Сравниваем время (минута в минуту)
                 text(
                     "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)"
                 ),
-
                 # Исключаем те, что уже выполнены сегодня (has_done_execution_today == True)
-                ~has_done_execution_today
+                ~has_done_execution_today,
             )
         )
 

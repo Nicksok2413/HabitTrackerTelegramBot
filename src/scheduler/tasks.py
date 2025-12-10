@@ -66,7 +66,6 @@ async def send_reminders() -> None:
 
             # Итерируемся по словарю и асинхронно отправляем уведомления
             for user, user_habits in user_habits_map.items():
-
                 # Формируем текст уведомления
                 habits_names = []
 
@@ -131,11 +130,15 @@ async def daily_maintenance() -> None:
             user_yesterday = text("(timezone(users.timezone, now())::date - 1)")
 
             # Подзапрос: существует ли запись 'DONE' для этой привычки на "вчера" (по времени юзера)
-            has_done_yesterday = select(1).where(
-                HabitExecution.habit_id == Habit.id,
-                HabitExecution.status == HabitExecutionStatus.DONE,
-                HabitExecution.execution_date == user_yesterday
-            ).exists()
+            has_done_yesterday = (
+                select(1)
+                .where(
+                    HabitExecution.habit_id == Habit.id,
+                    HabitExecution.status == HabitExecutionStatus.DONE,
+                    HabitExecution.execution_date == user_yesterday,
+                )
+                .exists()
+            )
 
             # Находим ID привычек для сброса
             # Явно джойним User'а, чтобы выражение users.timezone сработало
@@ -145,7 +148,7 @@ async def daily_maintenance() -> None:
                 .where(
                     Habit.is_active.is_(True),
                     Habit.current_streak > 0,
-                    ~has_done_yesterday  # Если вчера не было выполнения (`~` - отрицание)
+                    ~has_done_yesterday,  # Если вчера не было выполнения (`~` - отрицание)
                 )
             )
 
@@ -155,11 +158,7 @@ async def daily_maintenance() -> None:
 
             if habit_ids_to_reset:
                 # Массово обновляем привычки (сбрасываем стрик в 0)
-                update_statement = (
-                    update(Habit)
-                    .where(Habit.id.in_(habit_ids_to_reset))
-                    .values(current_streak=0)
-                )
+                update_statement = update(Habit).where(Habit.id.in_(habit_ids_to_reset)).values(current_streak=0)
 
                 await session.execute(update_statement)
 

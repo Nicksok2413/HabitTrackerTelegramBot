@@ -382,6 +382,9 @@ async def toggle_habit_status(
         callback_data (HabitActionCallback): Данные с ID привычки и типом действия.
         api_client (HabitTrackerClient): Клиент API.
     """
+    if not callback.message or not isinstance(callback.message, Message):
+        return
+
     # Определяем целевой статус для API
     target_status = "done" if callback_data.action == HabitAction.DONE else "pending"
 
@@ -397,8 +400,8 @@ async def toggle_habit_status(
 
         # Проверяем достигнута ли цель
         is_completed_now = (
-                updated_habit["current_streak"] >= updated_habit["target_days"]
-                and not updated_habit["is_active"]  # Она должна стать неактивной
+            updated_habit["current_streak"] >= updated_habit["target_days"]
+            and not updated_habit["is_active"]  # Она должна стать неактивной
         )
 
         # Если цель достигнута, показываем уведомление
