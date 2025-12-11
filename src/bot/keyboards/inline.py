@@ -90,6 +90,23 @@ def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: 
     return builder.as_markup()
 
 
+def get_back_to_list_keyboard(page: int = 0) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру с одной кнопкой возврата к списку привычек.
+
+    Args:
+        page (int): Номер страницы списка, на которую нужно вернуться.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с одной кнопкой возврата к списку привычек.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="🔙 К списку привычек", callback_data=HabitsNavigationCallback(page=page))
+
+    return builder.as_markup()
+
+
 def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = False) -> InlineKeyboardMarkup:
     """
     Генерирует клавиатуру для детального просмотра привычки.
@@ -133,7 +150,7 @@ def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = Fa
     )
 
     # Кнопка возврата к списку
-    builder.button(text="🔙 Назад к списку", callback_data=HabitsNavigationCallback(page=page).pack())
+    builder.button(text="🔙 К списку привычек", callback_data=HabitsNavigationCallback(page=page).pack())
 
     # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
     builder.adjust(1)

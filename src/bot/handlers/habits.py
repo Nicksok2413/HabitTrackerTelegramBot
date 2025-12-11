@@ -28,6 +28,7 @@ from src.bot.keyboards.callbacks import (
     HabitsNavigationCallback,
 )
 from src.bot.keyboards.inline import (
+    get_back_to_list_keyboard,
     get_habit_delete_confirmation_keyboard,
     get_habit_detail_keyboard,
     get_habit_edit_menu_keyboard,
@@ -155,6 +156,7 @@ async def _render_habits_page(
             tg_user=tg_user,
             skip=skip,
             limit=limit,
+            active_only=True,
         )
     except APIClientError:
         text = "❌ Не удалось загрузить список привычек."
@@ -407,11 +409,15 @@ async def toggle_habit_status(
         # Если цель достигнута, показываем уведомление
         if is_completed_now:
             await callback.message.edit_text(
-                f"🏆 <b>ПОЗДРАВЛЯЕМ!</b> 🏆\n\n"
-                f"Вы успешно закрепили привычку <b>{updated_habit['name']}</b>!\n"
-                f"Вы продержались {updated_habit['target_days']} дней подряд.\n\n"
-                f"Привычка перенесена в архив. Вы всегда можете активировать её снова через меню редактирования."
+                text=(
+                    f"🏆 <b>ПОЗДРАВЛЯЕМ!</b> 🏆\n\n"
+                    f"Вы успешно закрепили привычку <b>{updated_habit['name']}</b>!\n"
+                    f"Вы продержались {updated_habit['target_days']} дн. подряд.\n\n"
+                    f"Привычка перенесена в архив."
+                ),
+                reply_markup=get_back_to_list_keyboard(page=callback_data.page),
             )
+
         else:
             # Если нет - перерисовываем карточку привычки, чтобы показать актуальный статус и стрик
             await _render_habit_details(
