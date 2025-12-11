@@ -1,0 +1,94 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*$py.class
+.python-version
+dist/
+build/
+*.so
+*.lib
+*.dll
+
+# === Environment ===
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+ENV/
+
+# === Database ===
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+database/
+db.sqlite3-journal
+
+# === IDE ===
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+# VS Code
+.vscode/
+
+# === OS files ===
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# === Testing / coverage reports ===
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# === Ruff ===
+.ruff_cache/
+
+# === mypy ===
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# === Celery ===
+celerybeat-schedule
+*.pid
+
+# === PDM ===
+.pdm-build/
+.pdm-python
+.pdm.toml
+__pypackages__/
+
+# === Docker ===
+docker-compose.override.yml
+docker-compose.local.yml
+# Volumes
+#postgres_data/
+#redis_data/
+
+# === Project Specific ===
+logs/
+
+# === Others ===
+/node_modules/
+/docs/_build/
+/site/

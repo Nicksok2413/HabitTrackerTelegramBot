@@ -1,0 +1,230 @@
+"""
+Генераторы Inline-клавиатур (кнопок под сообщениями).
+
+Содержит функции для создания клавиатур списка привычек (с пагинацией),
+детального просмотра и меню действий с конкретной привычкой.
+"""
+
+from typing import Any
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from src.bot.core.enums import IGNORE_CALLBACK, HabitAction, ProfileAction
+from src.bot.keyboards.callbacks import (
+    HabitActionCallback,
+    HabitDetailCallback,
+    HabitsNavigationCallback,
+    ProfileActionCallback,
+)
+
+
+def get_profile_keyboard() -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру профиля с кнопкой изменения часового пояса.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="🌍 Изменить часовой пояс",
+        callback_data=ProfileActionCallback(action=ProfileAction.CHANGE_TIMEZONE),
+    )
+
+    return builder.as_markup()
+
+
+def get_habits_list_keyboard(habits: list[dict[str, Any]], page: int, has_next: bool) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру со списком привычек и кнопками навигации.
+
+    Args:
+        habits (list): Список словарей с данными привычек.
+        page (int): Номер текущей страницы (начиная с 0).
+        has_next (bool): Флаг, указывающий, есть ли следующая страница.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура списка.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Генерируем кнопки для каждой привычки
+    for habit in habits:
+        # Иконка стрика: огонек, если есть стрик > 0
+        streak_icon = "🔥" if habit.get("current_streak", 0) > 0 else "🔹"
+        # Иконка статуса на сегодня
+        status_icon = "✅" if habit.get("is_done_today", False) else "⬜"
+
+        button_text = f"{streak_icon} {habit['name']} {status_icon}"
+
+        # При нажатии передаем ID и действие 'view'
+        builder.button(text=button_text, callback_data=HabitDetailCallback(habit_id=habit["id"], page=page))
+
+    # Настраиваем макет: каждая привычка на новой строке (1 колонка)
+    builder.adjust(1)
+
+    # Формируем ряд кнопок навигации (Pagination)
+    nav_buttons = []
+
+    # Кнопка "Назад", если это не первая страница
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton(text="⬅️ Назад", callback_data=HabitsNavigationCallback(page=page - 1).pack())
+        )
+
+    # Индикатор страницы (неактивная кнопка)
+    nav_buttons.append(InlineKeyboardButton(text=f"📄 {page + 1}", callback_data=IGNORE_CALLBACK))
+
+    # Кнопка "Вперед", если есть следующая страница
+    if has_next:
+        nav_buttons.append(
+            InlineKeyboardButton(text="Вперед ➡️", callback_data=HabitsNavigationCallback(page=page + 1).pack())
+        )
+
+    # Добавляем ряд навигации в билдер, если кнопки есть
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    return builder.as_markup()
+
+
+def get_back_to_list_keyboard(page: int = 0) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру с одной кнопкой возврата к списку привычек.
+
+    Args:
+        page (int): Номер страницы списка, на которую нужно вернуться.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с одной кнопкой возврата к списку привычек.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="🔙 К списку привычек", callback_data=HabitsNavigationCallback(page=page))
+
+    return builder.as_markup()
+
+
+def get_habit_detail_keyboard(habit_id: int, page: int, is_done_today: bool = False) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру для детального просмотра привычки.
+
+    Включает кнопки действий (выполнить, отменить выполнение, редактировать, удалить) и навигации (назад).
+
+    Args:
+        habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
+        is_done_today (bool): Выполнена ли привычка сегодня.
+                              Влияет на отображение кнопки выполнения.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Кнопка выполнения
+    if not is_done_today:
+        builder.button(
+            text="✅ Выполнить сегодня",
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.DONE),
+        )
+    # Кнопка отмены выполнения
+    else:
+        builder.button(
+            text="↩️ Отменить выполнение",
+            callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.SET_PENDING),
+        )
+
+    # Кнопка меню редактирования привычки
+    builder.button(
+        text="✏️ Редактировать",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.OPEN_EDIT_MENU),
+    )
+
+    # Кнопка удаления
+    builder.button(
+        text="🗑 Удалить",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.REQUEST_DELETE),
+    )
+
+    # Кнопка возврата к списку
+    builder.button(text="🔙 К списку привычек", callback_data=HabitsNavigationCallback(page=page).pack())
+
+    # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+def get_habit_edit_menu_keyboard(habit_id: int, page: int) -> InlineKeyboardMarkup:
+    """
+    Клавиатура выбора поля для редактирования.
+
+    Args:
+        habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="📝 Название",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_NAME),
+    )
+    builder.button(
+        text="📄 Описание",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DESC),
+    )
+    builder.button(
+        text="📅 Цель (дни)",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_DAYS),
+    )
+    builder.button(
+        text="⏰ Время", callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.EDIT_TIME)
+    )
+
+    builder.button(
+        text="🔙 Назад к привычке",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW),
+    )
+
+    # Настраиваем макет: по 2 кнопки в ряд, последняя одна
+    builder.adjust(2, 2, 1)
+
+    return builder.as_markup()
+
+
+def get_habit_delete_confirmation_keyboard(habit_id: int, page: int) -> InlineKeyboardMarkup:
+    """
+    Генерирует клавиатуру подтверждения удаления.
+
+    Args:
+        habit_id (int): ID привычки.
+        page (int): Номер страницы списка для возврата.
+
+    Returns:
+        InlineKeyboardMarkup: Клавиатура с действиями.
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Кнопка подтверждения удаления
+    builder.button(
+        text="🔥 Да, удалить навсегда",
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.CONFIRM_DELETE),
+    )
+
+    # Кнопка отмены удаления
+    builder.button(
+        text="❌ Нет, отмена",
+        # Возвращаем пользователя к просмотру привычки ("view"), а не к списку
+        callback_data=HabitActionCallback(habit_id=habit_id, page=page, action=HabitAction.VIEW),
+    )
+
+    # Настраиваем макет: каждая кнопка на новой строке (1 колонка)
+    builder.adjust(1)
+
+    return builder.as_markup()

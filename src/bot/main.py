@@ -1,0 +1,82 @@
+"""
+Главный файл запуска Telegram бота.
+
+Отвечает за:
+- Инициализацию Bot и Dispatcher.
+- Регистрацию зависимостей (API Client).
+- Подключение роутеров (Handlers).
+- Запуск процесса Polling.
+"""
+
+import asyncio
+
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+
+from src.bot.core.config import settings
+from src.bot.handlers import common, habits, profile
+from src.bot.services.api_client import HabitTrackerClient
+from src.core_shared.logging_setup import setup_logger
+
+# Настраиваем логгер
+log = setup_logger("BotMain", log_level_override=settings.LOG_LEVEL)
+
+
+async def main() -> None:
+    """Запуск Telegram бота."""
+    log.info("🚀 Запуск Telegram бота...")
+
+    # Инициализация бота
+    # parse_mode=ParseMode.HTML позволяет использовать HTML теги в сообщениях
+    bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    # Инициализация диспетчера
+    # Диспетчер обрабатывает входящие обновления и маршрутизирует их в хендлеры
+    dp = Dispatcher()
+
+    # Инициализация API клиента
+    # Создаем экземпляр клиента, который будет жить пока живет бот
+    api_client = HabitTrackerClient()
+
+    # Внедрение зависимостей (Dependency Injection)
+    # Передаем api_client в workflow_data диспетчера
+    # Теперь любой хендлер может запросить аргумент `api_client` и получить этот экземпляр
+    dp["api_client"] = api_client
+
+    # Регистрация роутеров (хендлеров)
+    dp.include_router(habits.router)
+    dp.include_router(profile.router)
+    dp.include_router(common.router)
+
+    try:
+        # Удаляем вебхук и очищаем очередь обновлений, накопившихся пока бот спал
+        await bot.delete_webhook(drop_pending_updates=True)
+
+        log.info("Бот запущен и готов к работе (Polling mode).")
+
+        # Запуск поллинга (бесконечный цикл получения обновлений)
+        await dp.start_polling(bot)
+
+    except Exception as exc:
+        log.exception(f"Критическая ошибка при работе бота: {exc}")
+
+    finally:
+        # Корректное завершение (Graceful Shutdown)
+        log.info("Остановка бота...")
+
+        # Закрываем сессию API клиента
+        await api_client.close()
+
+        # Закрываем сессию бота
+        await bot.session.close()
+
+        log.info("Бот остановлен.")
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        # Обработка Ctrl+C в терминале
+        log.info("Бот остановлен вручную.")
