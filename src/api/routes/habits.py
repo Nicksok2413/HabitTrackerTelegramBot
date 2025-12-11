@@ -60,7 +60,10 @@ async def get_habits(
     habit_service: HabitSvc,
     skip: Annotated[int, Query(ge=0, description="Количество записей для пропуска (пагинация)")] = 0,
     limit: Annotated[int, Query(ge=1, le=200, description="Максимальное количество записей (пагинация)")] = 100,
-    active_only: Annotated[bool, Query(description="Вернуть только активные привычки"),] = True,
+    active_only: Annotated[
+        bool,
+        Query(description="Вернуть только активные привычки"),
+    ] = True,
 ) -> Sequence[HabitSchemaRead]:
     """
     Получает список привычек текущего пользователя с поддержкой пагинации.
