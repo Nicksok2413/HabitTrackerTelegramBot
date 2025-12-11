@@ -43,7 +43,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         encoded_jwt: str = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     except Exception as exc:
         log.error(f"Ошибка при кодировании JWT: {exc}", exc_info=True)
-        # В реальном приложении здесь может быть более специфическая обработка или re-raise
         raise RuntimeError("Не удалось создать токен доступа.") from exc
 
     return encoded_jwt
@@ -64,10 +63,6 @@ def verify_and_decode_token(token: str) -> TokenPayload:
     """
     try:
         payload_dict = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-
-        # Проверка наличия 'exp' и что токен не истек (хотя jwt.decode это тоже делает)
-        # Это больше для явности и возможности кастомной обработки, если нужно.
-        # jwt.decode выбросит ExpiredSignatureError, если токен истек.
 
         # Валидируем payload с помощью Pydantic схемы
         token_payload = TokenPayload(**payload_dict)
