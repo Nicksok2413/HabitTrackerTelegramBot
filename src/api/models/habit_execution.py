@@ -19,7 +19,7 @@ class HabitExecutionStatus(PyEnum):
 
     PENDING = "pending"  # Ожидает выполнения (создается на день)
     DONE = "done"  # Выполнено
-    NOT_DONE = "not_done"  # Не выполнено (пропущено)
+    NOT_DONE = "not_done"  # Не выполнено
 
 
 class HabitExecution(Base):
