@@ -40,14 +40,20 @@ async def login_for_access_token(
     user_service: UserSvc,
 ) -> Token:
     """
-    Обрабатывает запрос от бота на получение JWT токена.
+    Выдает JWT токен для пользователя Telegram.
 
-    1.  Принимает данные пользователя Telegram.
-    2.  Использует `UserService` для получения или создания пользователя.
-    3.  Создает JWT токен на основе `user.id`.
-    4.  Возвращает токен.
+    Этот эндпоинт защищен API-ключом бота и предназначен только для внутреннего использования ботом.
 
-    Этот эндпоинт защищен API-ключом бота.
+    Args:
+        request_data: Данные пользователя из Telegram (ID, username, etc).
+        db_session: Асинхронная сессия базы данных.
+        user_service: Сервис пользователей.
+
+    Returns:
+        Token: Объект с JWT токеном доступа.
+
+    Raises:
+        HTTPException(400): Если пользователь заблокирован/неактивен.
     """
     log.info(f"Запрос на токен для Telegram ID: {request_data.telegram_id}, Username: {request_data.username or 'N/A'}")
 

@@ -21,10 +21,13 @@ router = APIRouter(prefix="/users", tags=["Users"])
 )
 async def read_users_me(current_user: CurrentUser) -> User:
     """
-    Возвращает информацию о текущем аутентифицированном пользователе.
+    Возвращает данные текущего пользователя.
 
-    Зависимость `CurrentUser` обрабатывает аутентификацию и возвращает
-    объект `User` из базы данных.
+    Args:
+        current_user: Аутентифицированный пользователь.
+
+    Returns:
+        User: Объект пользователя.
     """
     log.info(f"Запрос информации о текущем пользователе: ID {current_user.id}")
     return current_user
@@ -44,8 +47,16 @@ async def update_user_me(
     user_update_data: UserSchemaUpdate,
 ) -> User:
     """
-    Обновляет данные текущего аутентифицированного пользователя.
-    Использует `telegram_id` из `current_user` для поиска и обновления.
+    Обновляет профиль текущего пользователя.
+
+    Args:
+        db_session: Асинхронная сессия базы данных.
+        current_user: Аутентифицированный пользователь.
+        user_service: Сервис пользователей.
+        user_update_data: Данные для обновления.
+
+    Returns:
+        User: Обновленный объект пользователя.
     """
     log.info(f"Обновление данных для пользователя ID: {current_user.id} (Telegram ID: {current_user.telegram_id})")
 

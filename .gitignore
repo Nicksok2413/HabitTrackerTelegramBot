@@ -81,14 +81,9 @@ __pypackages__/
 # === Docker ===
 docker-compose.override.yml
 docker-compose.local.yml
-# Volumes
-#postgres_data/
-#redis_data/
-
-# === Project Specific ===
-logs/
 
 # === Others ===
+logs/
 /node_modules/
 /docs/_build/
 /site/

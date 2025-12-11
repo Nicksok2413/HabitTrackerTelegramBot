@@ -5,13 +5,12 @@
 и валидацию данных перед передачей в репозиторий.
 """
 
-from typing import Any, Generic, Sequence, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.core.exceptions import BadRequestException, NotFoundException
+from src.api.core.exceptions import NotFoundException
 from src.api.core.logging import api_log as log
 from src.api.models import Base as SQLAlchemyBaseModel
 from src.api.repositories import BaseRepository
@@ -45,50 +44,6 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
         """
         self.repository = repository
 
-    def _get_order_by_clause(self, sort_by: str | None, descending: bool = False) -> list[ColumnElement[Any]] | None:
-        """
-        Формирует список выражений для сортировки SQLAlchemy на основе строкового имени поля.
-
-        Проверяет, существует ли указанное поле в модели, чтобы предотвратить
-        ошибки выполнения или попытки сортировки по недопустимым полям.
-
-        Args:
-            sort_by (str | None): Строковое имя поля модели для сортировки.
-            descending (bool): Флаг направления сортировки (True для DESC, False для ASC).
-
-        Returns:
-            list[ColumnElement[Any]] | None: Список выражений для order_by или None.
-                                                       (например, [self.repository.model.created_at.desc()]).
-
-        Raises:
-            BadRequestException: Если указанного поля не существует в модели.
-        """
-        model_name = self.repository.model.__name__
-
-        if not sort_by:
-            return None
-
-        # Проверяем наличие поля в модели
-        if not hasattr(self.repository.model.__table__.columns, sort_by):
-            log.warning(f"Попытка сортировки по несуществующему полю '{sort_by}' в модели {model_name}")
-
-            # Получаем список доступных колонок для подсказки в ошибке
-            available_columns = list(self.repository.model.__table__.columns.keys())
-
-            # Выбрасываем ошибку с информацией о доступных колонках модели
-            raise BadRequestException(
-                message=f"Некорректное поле для сортировки: '{sort_by}'. Доступные поля: {available_columns}",
-                error_type="invalid_sort_field",
-                loc=["query", "sort_by"],
-            )
-
-        field = getattr(self.repository.model.__table__.columns, sort_by)
-
-        # Формируем выражение сортировки
-        order_expression = desc(field) if descending else asc(field)
-
-        return [order_expression]
-
     async def get_by_id(self, db_session: AsyncSession, *, obj_id: int) -> ModelType:
         """
         Получает объект по ID или выбрасывает исключение, если объект не найден.
@@ -117,33 +72,6 @@ class BaseService(Generic[ModelType, RepositoryType, CreateSchemaType, UpdateSch
 
         # Возвращаем найденный объект
         return cast(ModelType, db_obj)  # Явное приведение типа для mypy
-
-    async def get_list(
-        self,
-        db_session: AsyncSession,
-        *,
-        skip: int = 0,
-        limit: int = 100,
-        sort_by: str | None = None,
-        descending: bool = False,
-    ) -> Sequence[ModelType]:
-        """
-        Получает список объектов с поддержкой пагинации и динамической сортировки.
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            skip (int): Количество записей для пропуска.
-            limit (int): Максимальное количество записей.
-            sort_by (str | None): Поле для сортировки.
-            descending (bool): Сортировать по убыванию.
-
-        Returns:
-            Sequence[ModelType]: Список объектов.
-        """
-        # Преобразуем строковые параметры сортировки в выражения SQLAlchemy
-        order_by_clause = self._get_order_by_clause(sort_by, descending)
-
-        return await self.repository.get_multi(db_session, skip=skip, limit=limit, order_by=order_by_clause)
 
     async def create(self, db_session: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """

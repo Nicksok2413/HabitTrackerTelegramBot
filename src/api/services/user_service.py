@@ -28,32 +28,6 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
         """
         super().__init__(repository=user_repository)
 
-    async def get_user_by_telegram_id(self, db_session: AsyncSession, *, telegram_id: int) -> User | None:
-        """
-        Получает пользователя по Telegram ID.
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            telegram_id (int): Telegram ID пользователя.
-
-        Returns:
-            User | None: Объект пользователя или None, если не найден.
-        """
-        return await self.repository.get_by_telegram_id(db_session, telegram_id=telegram_id)
-
-    async def get_user_by_username(self, db_session: AsyncSession, *, username: str) -> User | None:
-        """
-        Получает пользователя по его Username (если он есть).
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            username (str): Имя пользователя в Telegram.
-
-        Returns:
-            User | None: Объект пользователя или None, если не найден.
-        """
-        return await self.repository.get_by_username(db_session, username=username)
-
     async def get_or_create_user(self, db_session: AsyncSession, *, user_in: UserSchemaCreate) -> User:
         """
         Получает существующего пользователя по Telegram ID или создает нового, если он не найден.
@@ -133,6 +107,3 @@ class UserService(BaseService[User, UserRepository, UserSchemaCreate, UserSchema
         return await super().update(
             db_session, db_obj=user_to_update, obj_id=user_to_update.id, obj_in=user_update_data
         )
-
-    # Другие специфичные для пользователя методы, если нужны...
-    # Например, деактивация пользователя, проверка блокировки бота и т.д.

@@ -85,41 +85,6 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db_session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def get_multi(
-        self,
-        db_session: AsyncSession,
-        *,
-        skip: int = 0,
-        limit: int = 100,
-        order_by: list[ColumnElement[Any]] | None = None,
-    ) -> Sequence[ModelType]:
-        """
-        Получает список записей с пагинацией и опциональной сортировкой.
-
-        Args:
-            db_session (AsyncSession): Асинхронная сессия базы данных.
-            skip (int): Количество записей, которое нужно пропустить.
-            limit (int): Максимальное количество записей для возврата.
-            order_by (list[ColumnElement[Any]] | None): Список полей для сортировки
-                                                       (например, [self.model.created_at.desc()]).
-
-        Returns:
-            Sequence[ModelType]: Список экземпляров модели.
-        """
-        model_name = self.model.__name__
-
-        log.debug(f"Получение списка записей {model_name}: (skip={skip}, limit={limit}, order_by={order_by})")
-        statement = select(self.model)
-
-        if order_by:
-            statement = statement.order_by(*order_by)
-
-        statement = statement.offset(skip).limit(limit)
-        result = await db_session.execute(statement)
-        instances = result.scalars().all()
-        log.debug(f"Найдено {len(instances)} записей {model_name}.")
-        return instances
-
     async def get_multi_by_filter(
         self,
         db_session: AsyncSession,
