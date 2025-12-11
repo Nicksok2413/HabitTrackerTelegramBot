@@ -105,9 +105,6 @@ async def verify_bot_api_key(
     return True
 
 
-# Создаем зависимость, которую можно будет использовать в роутах для защиты эндпоинтов, предназначенных только для бота.
-BotAPIKeyAuth = Annotated[bool, Depends(verify_bot_api_key)]
-
 # --- Зависимость для получения текущего пользователя ---
 
 # Схема для JWT Bearer токена
