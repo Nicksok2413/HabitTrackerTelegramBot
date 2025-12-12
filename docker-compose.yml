@@ -41,6 +41,13 @@ services:
     container_name: habit_tracker_api
     # Команда для "продакшен" запуска (будет передана в entrypoint как "$@")
     command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    # Проверяет, готов ли api принимать запросы
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://0.0.0.0:8000/healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s  # Даем время на запуск api перед первой проверкой
     restart: unless-stopped
 
   # Сервис миграций
@@ -66,7 +73,7 @@ services:
       - bot_logs:/logs  # Монтируем том для логов
     depends_on:
       api:
-        condition: service_started # Бот ждет запуска API
+        condition: service_healthy # Запускаем только после того, как api станет healthy
     restart: unless-stopped
     networks:
       - backend
