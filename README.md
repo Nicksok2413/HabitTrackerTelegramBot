@@ -97,9 +97,10 @@
     ```bash
     make migrate
     ```
+    *Или: `docker compose run --rm api-migrate`*
 
 5.  **Готово!**
-    Бот доступен в Telegram. API доступно по адресу `http://localhost:8000/docs`.
+    Бот доступен в Telegram. API доступно по адресу `http://localhost:8000/docs` (`http://0.0.0.0:8000/docs`).
 
 ---
 
