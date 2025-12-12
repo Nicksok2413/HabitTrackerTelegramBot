@@ -232,7 +232,7 @@ class HabitTrackerClient:
         """
         Получает полную информацию о привычке, включая историю выполнений.
 
-        Использует эндпоинт GET /habits/{id}/details.
+        Использует эндпоинт GET /habits/{id}.
 
         Args:
             tg_user (TelegramUser): Пользователь Telegram.
@@ -242,7 +242,7 @@ class HabitTrackerClient:
             dict[str, Any]: Словарь с данными привычки (с полем 'executions').
         """
 
-        response = await self._request("GET", f"/habits/{habit_id}/details", tg_user)
+        response = await self._request("GET", f"/habits/{habit_id}", tg_user)
 
         # Явная типизация для mypy
         return cast(dict[str, Any], response)

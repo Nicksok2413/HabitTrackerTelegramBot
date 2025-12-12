@@ -92,13 +92,13 @@ async def get_habits(
 
 
 @router.get(
-    "/{habit_id}/details",
+    "/{habit_id}",
     response_model=HabitSchemaReadWithExecutions,
     status_code=status.HTTP_200_OK,
     summary="Получение конкретной привычки по ID вместе с ее выполнениями",
     description="Возвращает детали привычки (включая выполнения), если она принадлежит пользователю.",
 )
-async def get_habit_details(
+async def get_habit(
     db_session: DBSession,
     current_user: CurrentUser,
     habit_service: HabitSvc,
