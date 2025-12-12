@@ -41,7 +41,7 @@ class HabitTrackerClient:
         self.base_url = settings.API_V1_URL
         self.shared_key = settings.API_BOT_SHARED_KEY
 
-        # Создаем клиента httpx
+        # Создаем клиент httpx
         # Используем один клиент на время жизни бота для connection pooling
         self.http_client = httpx.AsyncClient(
             base_url=self.base_url,
@@ -74,7 +74,6 @@ class HabitTrackerClient:
             "username": tg_user.username,
             "first_name": tg_user.first_name,
             "last_name": tg_user.last_name,
-            # Можно передать timezone, если мы её знаем (пока нет)
         }
 
         # Аутентифицируем запрос от имени Бота с помощью секретного ключа
@@ -129,7 +128,7 @@ class HabitTrackerClient:
             Any: Данные ответа (обычно dict или list).
         """
         try:
-            # Получаем токен (в будущем здесь можно добавить кэширование токена в Redis/Memory)
+            # Получаем токен
             token = await self._get_user_token(tg_user)
 
             # Формируем заголовки
@@ -232,7 +231,7 @@ class HabitTrackerClient:
         """
         Получает полную информацию о привычке, включая историю выполнений.
 
-        Использует эндпоинт GET /habits/{id}.
+        Использует эндпоинт GET /habits/{id}/.
 
         Args:
             tg_user (TelegramUser): Пользователь Telegram.
@@ -336,7 +335,7 @@ class HabitTrackerClient:
         """
         Удаляет привычку.
 
-        Использует эндпоинт DELETE /habits/{id}.
+        Использует эндпоинт DELETE /habits/{id}/.
 
         Args:
             tg_user (TelegramUser): Пользователь Telegram.

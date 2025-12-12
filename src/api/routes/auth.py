@@ -64,7 +64,6 @@ async def login_for_access_token(
         first_name=request_data.first_name,
         last_name=request_data.last_name,
         timezone=request_data.timezone or "UTC",  # Если пришло None, то по умолчанию "UTC"
-        # is_active и is_bot_blocked будут по умолчанию из модели User
     )
 
     # Получаем или создаем пользователя
@@ -72,7 +71,7 @@ async def login_for_access_token(
 
     if not user.is_active:
         log.warning(f"Попытка входа неактивного пользователя: Telegram ID {user.telegram_id}")
-        # Вместо ForbiddenException, можно использовать HTTPException, т.к. это специфичная логика входа
+        # Вместо ForbiddenException используем HTTPException, т.к. это специфичная логика входа
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Пользователь неактивен и не может войти.",
@@ -82,5 +81,6 @@ async def login_for_access_token(
     access_token = create_access_token(data={"user_id": user.id})
 
     log.info(f"Токен успешно создан для пользователя ID: {user.id} (Telegram ID: {user.telegram_id})")
+
     # Добавляем noqa: S106, чтобы заглушить ложное срабатывание
     return Token(access_token=access_token, token_type="bearer")  # noqa: S106

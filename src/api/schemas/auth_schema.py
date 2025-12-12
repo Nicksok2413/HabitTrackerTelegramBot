@@ -20,8 +20,6 @@ class TokenPayload(BaseModel):
 
     user_id: int = Field(..., description="ID пользователя (внутренний)")
     exp: int | None = Field(None, description="Время истечения токена (Unix timestamp)")
-    # Можно добавить другие поля, если они нужны в payload, например, 'sub' (subject)
-    # sub: str | None = Field(None, description="Subject - обычно email или username")
 
 
 class BotLoginRequest(BaseModel):
