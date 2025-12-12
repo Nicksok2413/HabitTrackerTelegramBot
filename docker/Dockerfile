@@ -59,9 +59,10 @@ WORKDIR /app
 
 # Устанавливаем runtime-зависимости:
 # - libpq-dev: для работы драйвера psycopg
+# - curl: для healthcheck
 # `rm -rf /var/lib/apt/lists/*` — удаляем списки пакетов для уменьшения размера образа
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq-dev && \
+    apt-get install -y --no-install-recommends libpq-dev curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Создаем группу с GID 1000 и непривилегированного пользователя с UID 1000
