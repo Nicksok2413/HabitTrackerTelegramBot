@@ -1,0 +1,66 @@
+# === Docker ===
+.dockerignore
+docker
+Dockerfile
+docker-compose.yml
+docker-compose.local.yml
+docker-compose.test.yml
+docker-compose.override.yml
+
+# === Git ===
+.git
+.github
+.gitignore
+
+# === Python ===
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# === IDE ===
+.idea
+.vscode
+
+# === Environment ===
+.env
+.env.*
+.venv
+venv
+env
+ENV
+
+# === OS ===
+*.log
+*.pot
+*.swo
+*.swp
+*.DS_Store
+Thumbs.db
+
+# === Local files ===
+*.local
+
+# === Database ===
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# === Testing / coverage reports ===
+.pytest_cache
+.coverage
+htmlcov
+tests
+
+# === mypy ===
+.mypy_cache/
+
+# === Ruff ===
+.ruff_cache/
+
+# === Other ===
+README.md
+*.md
+.pre-commit-config.yaml
+/logs
