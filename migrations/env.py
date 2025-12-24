@@ -6,8 +6,12 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 # Импортируем базовую модель SQLAlchemy
-from src.api.models import Base  # Это подтянет все модели через __init__
+from src.api.models import Base
+# Импортируем все модели, чтобы они зарегистрировались в Base.metadata
+import src.api.models
+
 from src.core_shared.logging_setup import setup_logger
+
 
 # Настройка логирования
 
