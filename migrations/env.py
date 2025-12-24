@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 # Импортируем базовую модель SQLAlchemy
 from src.api.models import Base
+
 # Импортируем все модели, чтобы они зарегистрировались в Base.metadata
 import src.api.models
 
