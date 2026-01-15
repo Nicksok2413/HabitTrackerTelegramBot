@@ -1,105 +1,96 @@
 """
 Задачи для планировщика.
 
-Содержит логику отправки напоминаний пользователям о необходимости выполнить привычки.
+Генерирует события для Celery worker'ов и выполняет обслуживание БД.
 """
 
-from collections import defaultdict
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from aiogram import Bot
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from sqlalchemy import select, text, update
 
 from src.api.core.database import db
 from src.api.models import Habit, HabitExecution, HabitExecutionStatus, User
-from src.api.repositories import HabitRepository, UserRepository
+from src.api.repositories import HabitRepository
 from src.core_shared.logging_setup import setup_logger
 from src.scheduler.config import settings
+from src.worker.tasks import send_habit_notification_task
 
 # Настраиваем логгер
 log = setup_logger("SchedulerTasks", log_level_override=settings.LOG_LEVEL)
 
-# Создаем бота глобально для модуля (он нужен только для отправки сообщений)
-bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-
-async def send_reminders() -> None:
+async def schedule_reminders() -> None:
     """
-    Периодическая задача для отправки напоминаний о привычках.
+    Генератор задач для отправки напоминаний о привычках.
 
     Алгоритм работы:
-    1. Открывает сессию базы данных.
-    2. Находит активные привычки, время напоминания которых (в часовом поясе пользователя)
-       совпадает с текущим временем сервера (UTC).
-    3. Отправляет сообщения пользователям в Telegram.
-    4. Обрабатывает ошибки (например, если пользователь заблокировал бота).
+    1. Получает список уникальных активных таймзон из БД.
+    2. Для каждой таймзоны вычисляет текущее локальное время.
+    3. Делает точечный запрос к БД для поиска привычек на это время.
+    4. Отправляет задачи в очередь Celery (Redis).
     """
-    log.info("🔍 Запуск задачи проверки напоминаний...")
+    log.info("🔍 Запуск проверки напоминаний...")
 
     # Используем асинхронный контекстный менеджер для сессии БД
     async with db.session() as session:
         # Репозиторий привычек
         habit_repo = HabitRepository(Habit)
 
-        # Репозиторий пользователей нужен для обновления статуса блокировки бота
-        user_repo = UserRepository(User)
-
         try:
-            # Получаем привычки, о которых нужно напомнить прямо сейчас
-            habits_to_remind = await habit_repo.get_habits_needing_notification(db_session=session)
+            # Получаем список уникальных таймзон
+            active_timezones = await habit_repo.get_active_timezones(db_session=session)
 
-            if not habits_to_remind:
-                log.debug("Нет привычек для напоминания в эту минуту.")
-                return
+            # Текущее время сервера (всегда UTC)
+            utc_now = datetime.now(timezone.utc)
 
-            log.info(f"Найдено {len(habits_to_remind)} привычек для отправки уведомлений.")
-
-            # Группируем привычки по пользователю
-            user_habits_map = defaultdict(list)  # Словарь: { user_obj: [habit1, habit2, ...] }
-
-            # Итерируемся по привычкам и добавляем данные в словарь
-            for habit in habits_to_remind:
-                if habit.user and habit.user.telegram_id:
-                    user_habits_map[habit.user].append(habit)
-
-            # Итерируемся по словарю и асинхронно отправляем уведомления
-            for user, user_habits in user_habits_map.items():
-                # Формируем текст уведомления
-                habits_names = []
-
-                for habit in user_habits:
-                    habits_names.append(f"• <b>{habit.name}</b>")
-
-                notification = "⏰ <b>Напоминание!</b>\nПора выполнить следующие привычки:\n" + "\n".join(habits_names)
-
+            for timezone_name in active_timezones:
                 try:
-                    # Отправляем уведомление
-                    await bot.send_message(chat_id=user.telegram_id, text=notification)
-                    log.info(f"✅ Напоминание отправлено пользователю {user.telegram_id} (Habit ID: {habit.id})")
+                    # Вычисляем локальное время
+                    local_now = utc_now.astimezone(ZoneInfo(timezone_name))
 
-                except TelegramForbiddenError:
-                    # Пользователь заблокировал бота
-                    log.warning(f"🚫 Пользователь {user.telegram_id} заблокировал бота. Обновляем статус в БД.")
+                    # Нам нужны часы и минуты (ЧЧ:ММ:00)
+                    target_time = local_now.time().replace(second=0, microsecond=0)
+                    target_date = local_now.date()
 
-                    # Обновляем флаг is_bot_blocked пользователя, чтобы больше не пытаться отправлять ему уведомления
-                    # И не спамить БД запросами
-                    await user_repo.update(session, db_obj=user, obj_in={"is_bot_blocked": True})
+                    # Получаем привычки, о которых нужно напомнить
+                    habits_to_remind = await habit_repo.get_habits_for_notification(
+                        db_session=session,
+                        timezone=timezone_name,
+                        target_time=target_time,
+                        target_date=target_date,
+                    )
 
-                    # Фиксируем изменение статуса пользователя
-                    await session.commit()
+                    if not habits_to_remind:
+                        continue
 
-                except TelegramBadRequest as exc:
-                    # Ошибки валидации со стороны Telegram (например, чат не найден)
-                    log.error(f"❌ Ошибка Telegram API при отправке пользователю {user.telegram_id}: {exc}")
+                    log.info(
+                        f"({timezone_name}) {target_time}: "
+                        f"Найдено {len(habits_to_remind)} привычек для отправки уведомлений."
+                    )
+
+                    for habit in habits_to_remind:
+                        if not habit.user.telegram_id:
+                            continue
+
+                        # Формируем уникальный ключ идемпотентности (ID привычки + Дата + Часы:Минуты)
+                        idempotency_key = f"{habit.id}_{target_date.isoformat()}_{target_time.strftime('%H%M')}"
+
+                        # Отправляем задачу в очередь Celery
+                        send_habit_notification_task.delay(
+                            chat_id=habit.user.telegram_id,
+                            habit_name=habit.name,
+                            idempotency_key=idempotency_key,
+                        )  # .delay() - асинхронная отправка, возвращает управление мгновенно
+
+                except ZoneInfoNotFoundError:
+                    log.error(f"Неизвестная таймзона в БД: {timezone_name}")
                 except Exception as exc:
-                    # Любые другие ошибки при отправке конкретного сообщения не должны прерывать цикл
-                    log.error(f"❌ Непредвиденная ошибка при отправке (User: {user.telegram_id}): {exc}")
+                    log.error(f"Ошибка обработки таймзоны {timezone_name}: {exc}", exc_info=True)
 
+        # Глобальная ошибка (например, отвал БД)
         except Exception as exc:
-            # Глобальная ошибка в задаче (например, отвал БД)
-            log.error(f"💥 Критическая ошибка в цикле send_reminders: {exc}", exc_info=True)
+            log.error(f"💥 Критическая ошибка в schedule_reminders: {exc}", exc_info=True)
 
 
 async def daily_maintenance() -> None:
@@ -178,7 +169,7 @@ async def daily_maintenance() -> None:
 
                 await session.execute(update_statement)
 
-                # Фиксируем изменения в базе данных
+                # Фиксируем изменения
                 await session.commit()
 
                 log.info(f"📉 Сброшен стрик у {len(habit_ids_to_reset)} пропущенных привычек.")
