@@ -3,7 +3,7 @@
 from datetime import time
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, Text, Time
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -23,7 +23,7 @@ class Habit(Base):
         name: Название привычки.
         description: Описание привычки (опционально).
         target_days: Количество дней, необходимое для закрепления привычки (например, 21).
-        time_to_remind: Время дня для отправки напоминания.
+        time_to_remind: Время дня для отправки напоминания (без учета часового пояса).
         is_active: Флаг, активна ли привычка в данный момент (для трекинга).
         current_streak: Текущая непрерывная серия выполнений привычки.
         max_streak: Максимальная достигнутая непрерывная серия выполнений.
@@ -45,3 +45,6 @@ class Habit(Base):
     # Связи
     user: Mapped["User"] = relationship(back_populates="habits")
     executions: Mapped[list["HabitExecution"]] = relationship(back_populates="habit", cascade="all, delete-orphan")
+
+    # Составной индекс для планировщика, позволяет базе мгновенно находить все активные привычки на заданное время
+    __table_args__ = (Index("ix_habits_time_active", "time_to_remind", "is_active"),)
