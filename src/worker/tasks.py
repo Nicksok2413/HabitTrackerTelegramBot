@@ -39,10 +39,7 @@ async def _send_telegram_message_async(chat_id: int, text: str) -> None:
     # Создаем бота внутри задачи
     # В Celery каждый процесс живет долго, но задачи изолированы
     # Менеджер контекста автоматически закроет сессию aiohttp
-    async with Bot(
-            token=settings.BOT_TOKEN,
-            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    ) as bot:
+    async with Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML)) as bot:
         await bot.send_message(chat_id=chat_id, text=text)
 
 
@@ -98,12 +95,7 @@ async def _block_user_async(telegram_id: int) -> None:
     default_retry_delay=5,  # Пауза между попытками
     acks_late=True,  # Подтверждать задачу только после выполнения
 )
-def send_habit_notification_task(
-        self: Any,
-        chat_id: int,
-        habit_name: str,
-        idempotency_key: str
-) -> str:
+def send_habit_notification_task(self: Any, chat_id: int, habit_name: str, idempotency_key: str) -> str:
     """
     Задача отправки уведомления о привычке.
 
@@ -120,7 +112,7 @@ def send_habit_notification_task(
         f"lock:notification:{idempotency_key}",
         "sent",
         nx=True,  # Not Exists - запишет только если ключа нет
-        ex=86400  # TTL - ключ протухнет через 24 часа (для автоочистки)
+        ex=86400,  # TTL - ключ протухнет через 24 часа (для автоочистки)
     )
 
     if not lock_acquired:
@@ -128,10 +120,7 @@ def send_habit_notification_task(
         return "Пропущено (дубликат)"
 
     # Формируем текст уведомления
-    notification = (
-        f"⏰ <b>Напоминание!</b>\n"
-        f"Пора выполнить привычку: <b>{habit_name}</b>"
-    )
+    notification = f"⏰ <b>Напоминание!</b>\nПора выполнить привычку: <b>{habit_name}</b>"
 
     try:
         # Запускаем асинхронный код в синхронном окружении Celery

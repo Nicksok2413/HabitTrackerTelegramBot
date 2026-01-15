@@ -177,7 +177,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
                 # Фильтры активности
                 User.is_active.is_(True),  # Только активные юзеры
                 User.is_bot_blocked.is_(False),  # Которые не заблочили бота
-                Habit.is_active.is_(True)  # Только активные привычки
+                Habit.is_active.is_(True),  # Только активные привычки
             )
             .distinct()  # Выбираем уникальные таймзоны
         )
@@ -229,7 +229,7 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
                 User.timezone == timezone,
                 self.model.time_to_remind == target_time,
                 # Фильтр "еще не выполнены"
-                ~has_done_execution
+                ~has_done_execution,
             )
             # Подгружаем юзера, чтобы знать telegram_id для отправки
             .options(selectinload(self.model.user))

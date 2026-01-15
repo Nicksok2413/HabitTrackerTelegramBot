@@ -20,14 +20,11 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-
     # Часовой пояс
     timezone="UTC",
     enable_utc=True,
-
     # Обработка потери соединения с брокером при старте
     broker_connection_retry_on_startup=True,
-
     # Глобальный Rate Limit
     task_default_rate_limit="30/s",
 )
