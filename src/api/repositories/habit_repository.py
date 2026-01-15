@@ -1,8 +1,9 @@
 """Репозиторий для работы с моделью Habit."""
 
+from datetime import date, time
 from typing import Any, Sequence
 
-from sqlalchemy import ColumnElement, select, text
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -157,57 +158,82 @@ class HabitRepository(BaseRepository[Habit, HabitSchemaCreate, HabitSchemaUpdate
         log.debug(f"Найдено {len(habits)} привычек для пользователя ID: {user_id}.")
         return habits
 
-    async def get_habits_needing_notification(self, db_session: AsyncSession) -> Sequence[Habit]:
+    async def get_active_timezones(self, db_session: AsyncSession) -> Sequence[str]:
         """
-        Находит активные привычки для напоминания, которые еще не были выполнены сегодня.
+        Получает список уникальных часовых поясов пользователей, у которых есть активные привычки.
 
-        Время напоминания привычек совпадает с текущим временем в часовом поясе пользователя.
+        Используется планировщиком.
 
         Args:
             db_session (AsyncSession): Асинхронная сессия базы данных.
 
         Returns:
+            Sequence[str]: Список строк таймзон (например, ['UTC', 'Europe/Moscow']).
+        """
+        statement = (
+            select(User.timezone)
+            .join(Habit.user)
+            .where(
+                # Фильтры активности
+                User.is_active.is_(True),  # Только активные юзеры
+                User.is_bot_blocked.is_(False),  # Которые не заблочили бота
+                Habit.is_active.is_(True)  # Только активные привычки
+            )
+            .distinct()  # Выбираем уникальные таймзоны
+        )
+
+        result = await db_session.execute(statement)
+
+        return result.scalars().all()
+
+    async def get_habits_for_notification(
+        self,
+        db_session: AsyncSession,
+        timezone: str,
+        target_time: time,
+        target_date: date,
+    ) -> Sequence[Habit]:
+        """
+        Находит активные привычки, которые еще не были выполнены,
+        для отправки уведомлений в конкретном часовом поясе.
+
+        Args:
+            db_session (AsyncSession): Асинхронная сессия базы данных.
+            timezone (str): Часовой пояс (например, 'Europe/Moscow').
+            target_time (time): Время напоминания (ЧЧ:ММ:00).
+            target_date (date): Локальная дата пользователя (для проверки выполнения).
+
+        Returns:
             Sequence[Habit]: Список привычек пользователя, о выполнении которых нужно напомнить.
         """
-        # Конвертируем UTC время сервера в локальное время пользователя, используя его timezone
-
-        # Функция `timezone(zone_name, timestamp)` специфична для PostgreSQL
-        # Она конвертирует время из одной зоны в другую внутри SQL-запроса
-
-        # SQL-выражение для текущей даты пользователя
-        user_current_date = text("timezone(users.timezone, now())::date")
-
-        # Подзапрос: существует ли запись 'DONE' для этой привычки на "сегодня" (по времени юзера)
-        has_done_execution_today = (
+        # Подзапрос: находим ID привычек, которые уже выполнены (DONE) на целевую дату
+        has_done_execution = (
             select(1)
             .where(
                 HabitExecution.habit_id == self.model.id,
                 HabitExecution.status == HabitExecutionStatus.DONE,
-                HabitExecution.execution_date == user_current_date,
+                HabitExecution.execution_date == target_date,
             )
             .exists()
         )
 
-        # Функция `date_trunc('minute', ...)` специфична для PostgreSQL
-        # Она округляет время до заданной точности (отбрасываем секунды, чтобы сравнивать только ЧЧ:ММ)
         statement = (
             select(self.model)
             .join(self.model.user)
             .where(
-                self.model.is_active.is_(True),
-                self.model.user.has(User.is_active.is_(True)),  # Только активным юзерам
-                self.model.user.has(User.is_bot_blocked.is_(False)),  # Которые не заблочили бота
-                # Сравниваем время (минута в минуту)
-                text(
-                    "date_trunc('minute', habits.time_to_remind) = date_trunc('minute', timezone(users.timezone, now())::time)"
-                ),
-                # Исключаем те, что уже выполнены сегодня (has_done_execution_today == True)
-                ~has_done_execution_today,
+                # Фильтры активности
+                self.model.is_active.is_(True),  # Только активные привычки
+                User.is_active.is_(True),  # Только активным юзерам
+                User.is_bot_blocked.is_(False),  # Которые не заблочили бота
+                # Фильтры по индексам
+                User.timezone == timezone,
+                self.model.time_to_remind == target_time,
+                # Фильтр "еще не выполнены"
+                ~has_done_execution
             )
+            # Подгружаем юзера, чтобы знать telegram_id для отправки
+            .options(selectinload(self.model.user))
         )
-
-        # Подгружаем пользователя, чтобы знать telegram_id для отправки
-        statement = statement.options(selectinload(self.model.user))
 
         result = await db_session.execute(statement)
 
