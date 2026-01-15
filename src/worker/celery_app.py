@@ -5,6 +5,7 @@
 """
 
 from celery import Celery
+
 from src.api.core.config import settings
 
 # Создаем экземпляр приложения

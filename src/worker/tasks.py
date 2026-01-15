@@ -132,7 +132,7 @@ def send_habit_notification_task(self: Any, chat_id: int, habit_name: str, idemp
         # Если Telegram просит подождать (429 Too Many Requests)
         logger.warning(f"Ограничение количества запросов в Telegram. Ожидание {exc.retry_after} сек.")
         # Ретраим задачу через указанное время
-        raise self.retry(exc=exc, countdown=exc.retry_after)
+        raise self.retry(exc=exc, countdown=exc.retry_after) from exc
 
     except TelegramForbiddenError:
         # Пользователь заблокировал бота
@@ -149,4 +149,4 @@ def send_habit_notification_task(self: Any, chat_id: int, habit_name: str, idemp
     except Exception as exc:
         logger.error(f"❌ Непредвиденная ошибка при отправке напоминания пользователю (telegram_id: {chat_id}): {exc}")
         # В случае неизвестной ошибки, не удаляем лок, чтобы не спамить пользователя
-        raise self.retry(exc=exc)
+        raise self.retry(exc=exc) from exc
