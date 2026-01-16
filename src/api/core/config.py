@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     )
     DB_PORT: int = Field(default=5432, description="Порт хоста базы данных")
 
+    # Настройки Redis
+    REDIS_URL: str = Field(default="redis://redis:6379/0", description="URL брокера сообщений Redis")
+
     # Настройки режима разработки/тестирования (для продакшен - False)
     DEVELOPMENT: bool = Field(default=False, description="Режим разработки/тестирования")
 
@@ -50,7 +53,7 @@ class Settings(BaseSettings):
     BOT_TOKEN: str = Field(..., description="Токен бота")
     JWT_SECRET_KEY: str = Field(..., description="JWT")
 
-    # Бизнес-константы проекта
+    # Бизнес-константы
     DAYS_TO_FORM_HABIT: int = Field(
         default=21,
         description="Количество дней, необходимое для формирования привычки",

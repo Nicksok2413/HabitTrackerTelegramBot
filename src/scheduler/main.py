@@ -15,7 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 from src.api.core.database import db
 from src.core_shared.logging_setup import setup_logger
 from src.scheduler.config import settings
-from src.scheduler.tasks import bot, daily_maintenance, send_reminders
+from src.scheduler.tasks import daily_maintenance, schedule_reminders
 
 # Настраиваем логгер
 log = setup_logger("SchedulerMain", log_level_override=settings.LOG_LEVEL)
@@ -38,10 +38,10 @@ async def main() -> None:
     # Добавляем задачу отправки уведомлений пользователям
     # CronTrigger(second=0): запускать в начале каждой минуты (XX:XX:00)
     scheduler.add_job(
-        send_reminders,
+        schedule_reminders,
         trigger=CronTrigger(second=0),
         id="send_reminders_job",
-        name="Ежеминутная проверка напоминаний о привычках",
+        name="Ежеминутная генерация задач уведомлений",
         replace_existing=True,  # Перезаписывать задачу при перезапуске
     )
 
@@ -80,9 +80,6 @@ async def main() -> None:
 
         # Закрываем соединение с базой данных
         await db.disconnect()
-
-        # Закрываем сессию бота
-        await bot.session.close()
 
         log.info("Планировщик (Scheduler) остановлен корректно.")
 

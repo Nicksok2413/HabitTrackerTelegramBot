@@ -136,9 +136,10 @@ FROM base-runner AS scheduler
 COPY ./docker/api/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Копируем код API (планировщик использует модели и репозитории из src.api) и код планировщика
+# Копируем код API (планировщик использует модели и репозитории из src.api), код планировщика и воркера
 COPY --chown=appuser:appgroup ./src/api ./src/api
 COPY --chown=appuser:appgroup ./src/scheduler ./src/scheduler
+COPY --chown=appuser:appgroup ./src/worker ./src/worker
 
 # Меняем владельца рабочей директории на appuser
 RUN chown appuser:appgroup /app
@@ -148,3 +149,25 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # Дефолтная команда (для самодостаточности контейнера)
 CMD ["python", "src/scheduler/main.py"]
+
+# ==================================================================================
+# 6. "worker": Финальный образ для воркера (Celery)
+# ==================================================================================
+FROM base-runner AS worker
+
+# Копируем entrypoint-скрипт от API (воркеру тоже нужно ждать БД) и устанавливаем ему права на выполнение
+COPY ./docker/api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Воркеру нужен доступ практически ко всему коду (модели, конфиги, задачи)
+COPY --chown=appuser:appgroup ./src ./src
+
+# Меняем владельца рабочей директории на appuser
+RUN chown appuser:appgroup /app
+
+# Устанавливаем скрипт как точку входа (он будет выполнен перед основной командой контейнера)
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Дефолтная команда (для самодостаточности контейнера)
+# -c 2: количество процессов (concurrency), для rate limit 25/s этого достаточно
+CMD ["celery", "-A", "src.worker.celery_app", "worker", "-l", "info", "-c", "2"]

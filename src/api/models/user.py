@@ -33,7 +33,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(100), index=True)
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
-    timezone: Mapped[str] = mapped_column(String(50), default="UTC", nullable=False)
+    timezone: Mapped[str] = mapped_column(String(50), default="UTC", index=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_bot_blocked: Mapped[bool] = mapped_column(default=False, nullable=False)
 
