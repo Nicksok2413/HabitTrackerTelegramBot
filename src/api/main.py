@@ -134,8 +134,3 @@ async def health_check(
         log.warning("Health check провален: нет подключения к базе данных.")
 
     return response_body
-
-
-@app.get("/sentry-debug")
-async def trigger_error() -> None:
-    division_by_zero = 1 / 0  # noqa
