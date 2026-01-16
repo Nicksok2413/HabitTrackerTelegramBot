@@ -18,6 +18,7 @@ from src.bot.core.config import settings
 from src.bot.handlers import common, habits, profile
 from src.bot.services.api_client import HabitTrackerClient
 from src.core_shared.logging_setup import setup_logger
+from src.core_shared.sentry_sdk_setup import setup_sentry
 
 # Настраиваем логгер
 log = setup_logger("BotMain", log_level_override=settings.LOG_LEVEL)
@@ -25,6 +26,11 @@ log = setup_logger("BotMain", log_level_override=settings.LOG_LEVEL)
 
 async def main() -> None:
     """Запуск Telegram бота."""
+
+    # Вызываем инициализацию Sentry, передавая настройки и название сервиса
+    if settings.SENTRY_DSN:
+        setup_sentry(settings, service_name="Bot")
+
     log.info("🚀 Запуск Telegram бота...")
 
     # Инициализация бота

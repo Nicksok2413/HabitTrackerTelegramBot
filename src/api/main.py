@@ -21,9 +21,9 @@ from src.api.core.logging import api_log as log
 from src.api.routes import api_router
 from src.core_shared.sentry_sdk_setup import setup_sentry
 
-# Вызываем инициализацию Sentry, передавая настройки и уровень логирования
+# Вызываем инициализацию Sentry, передавая настройки и название сервиса
 if settings.SENTRY_DSN:
-    setup_sentry(settings, log_level=settings.LOG_LEVEL)
+    setup_sentry(settings, service_name="API")
 
 
 # Определяем lifespan для управления подключением к БД
@@ -134,3 +134,8 @@ async def health_check(
         log.warning("Health check провален: нет подключения к базе данных.")
 
     return response_body
+
+
+@app.get("/sentry-debug")
+async def trigger_error() -> None:
+    division_by_zero = 1 / 0  # noqa

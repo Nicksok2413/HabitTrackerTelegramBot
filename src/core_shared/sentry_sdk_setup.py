@@ -3,7 +3,8 @@
 from logging import ERROR, INFO  # Стандартные уровни логирования для Sentry
 from typing import Protocol  # Используем Protocol для определения "контракта" настроек
 
-from sentry_sdk import init as sentry_init, set_tag
+from sentry_sdk import init as sentry_init
+from sentry_sdk import set_tag
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -72,11 +73,9 @@ def setup_sentry(settings: SentrySettingsProtocol, service_name: str) -> None:
             dsn=sentry_dsn,
             environment=environment,
             release=f"{settings.PROJECT_NAME}@{settings.API_VERSION}",
-
             # Настройка производительности
             traces_sample_rate=traces_sample_rate,
             profiles_sample_rate=profiles_sample_rate,
-
             # Интеграции
             integrations=[
                 # HTTP клиент (используется в боте и клиентах)
