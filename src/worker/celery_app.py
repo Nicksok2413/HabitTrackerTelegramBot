@@ -7,6 +7,11 @@
 from celery import Celery
 
 from src.api.core.config import settings
+from src.core_shared.sentry_sdk_setup import setup_sentry
+
+# Вызываем инициализацию Sentry, передавая настройки и название сервиса
+if settings.SENTRY_DSN:
+    setup_sentry(settings, service_name="Worker")
 
 # Создаем экземпляр приложения
 celery_app = Celery(

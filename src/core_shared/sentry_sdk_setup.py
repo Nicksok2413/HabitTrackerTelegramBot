@@ -1,15 +1,23 @@
-"""Настройка Sentry SDK."""
+"""Централизованная настройка Sentry SDK."""
 
 from logging import ERROR, INFO  # Стандартные уровни логирования для Sentry
 from typing import Protocol  # Используем Protocol для определения "контракта" настроек
 
 from sentry_sdk import init as sentry_init
+from sentry_sdk import set_tag
+from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.loguru import LoguruIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.integrations.threading import ThreadingIntegration
 
 from src.core_shared.logging_setup import setup_logger
+
+# Создаем экземпляр логгера для процесса настройки Sentry
+sentry_log = setup_logger(service_name="SentrySetup")
 
 
 # Определяем протокол, описывающий, какие атрибуты мы ожидаем от объекта настроек
@@ -25,7 +33,7 @@ class SentrySettingsProtocol(Protocol):
 
 
 # Используем этот протокол в сигнатуре функции инициализации Sentry SDK
-def setup_sentry(settings: SentrySettingsProtocol, log_level: str) -> None:
+def setup_sentry(settings: SentrySettingsProtocol, service_name: str) -> None:
     """
     Инициализирует Sentry SDK, если задан DSN.
 
@@ -33,15 +41,13 @@ def setup_sentry(settings: SentrySettingsProtocol, log_level: str) -> None:
 
     Args:
         settings (SentrySettingsProtocol): Объект настроек.
-        log_level (str): Уровень логирования.
+        service_name (str): Имя сервиса (API, Bot, Worker, Scheduler) для тегов.
     """
-    # Создаем экземпляр логгера для Sentry
-    sentry_log = setup_logger(service_name="SentrySetup", log_level_override=log_level)
 
     sentry_dsn = settings.SENTRY_DSN
 
     if not sentry_dsn:
-        sentry_log.info("SENTRY_DSN не установлен, Sentry SDK не будет инициализирован.")
+        sentry_log.warning(f"SENTRY_DSN не установлен. Мониторинг ошибок для {service_name} отключен.")
         return
 
     # --- Определяем параметры Sentry ---
@@ -51,36 +57,50 @@ def setup_sentry(settings: SentrySettingsProtocol, log_level: str) -> None:
 
     # Частота семплирования для Performance Monitoring (Traces)
     # Установим 10% для production, 100% для development
-    traces_sample_rate = 0.1 if environment == "production" else 1.0
+    traces_sample_rate = 0.1 if settings.PRODUCTION else 1.0
 
     # Частота семплирования для Profiling аналогично трейсам
-    profiles_sample_rate = 0.1 if environment == "production" else 1.0
+    profiles_sample_rate = 0.1 if settings.PRODUCTION else 1.0
 
     # Уровни логирования для интеграции
     log_level_breadcrumbs = INFO  # Уровень для breadcrumbs
     log_level_events = ERROR  # Уровень для событий/ошибок
 
-    sentry_log.info(
-        f"Инициализация Sentry SDK. DSN: {'***' + sentry_dsn[-6:]}, "
-        f"Environment: {environment}, "
-        f"Traces Rate: {traces_sample_rate}, "
-        f"Profiles Rate: {profiles_sample_rate}"
-    )
+    sentry_log.info(f"Инициализация Sentry для {service_name} (Env: {environment})...")
 
     try:
         sentry_init(
             dsn=sentry_dsn,
-            integrations=[
-                StarletteIntegration(transaction_style="endpoint"),
-                FastApiIntegration(transaction_style="endpoint"),
-                SqlalchemyIntegration(),
-                LoguruIntegration(level=log_level_breadcrumbs, event_level=log_level_events),
-            ],
             environment=environment,
+            release=f"{settings.PROJECT_NAME}@{settings.API_VERSION}",
+            # Настройка производительности
             traces_sample_rate=traces_sample_rate,
             profiles_sample_rate=profiles_sample_rate,
-            release=f"{settings.PROJECT_NAME}@{settings.API_VERSION}",
+            # Интеграции
+            integrations=[
+                # HTTP клиент (используется в боте и клиентах)
+                AioHttpIntegration(),
+                # Асинхронность
+                AsyncioIntegration(),
+                # Работа с БД
+                SqlalchemyIntegration(),
+                # Starlette (База для FastAPI)
+                StarletteIntegration(transaction_style="endpoint"),
+                # FastAPI
+                FastApiIntegration(transaction_style="endpoint"),
+                # Loguru (перехват логов и отправка их как breadcrumbs/events)
+                LoguruIntegration(level=log_level_breadcrumbs, event_level=log_level_events),
+                # Celery
+                CeleryIntegration(),
+                # Логирование потоков (важно для Celery)
+                ThreadingIntegration(propagate_hub=True),
+            ],
         )
-        sentry_log.info("Sentry SDK успешно инициализирован.")
+
+        # Устанавливаем тег сервиса после инициализации
+        set_tag("service", service_name)
+
+        sentry_log.success("Sentry SDK успешно инициализирован.")
+
     except Exception as exc:
-        sentry_log.exception(f"Ошибка инициализации Sentry SDK: {exc}")
+        sentry_log.exception(f"Ошибка инициализации Sentry: {exc}")

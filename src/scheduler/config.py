@@ -1,14 +1,15 @@
 """Конфигурация планировщика."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from src.core_shared.config import AppSettings
 
 
-class Settings(BaseSettings):
+class Settings(AppSettings):
     """
     Основные настройки планировщика.
 
-    Наследуется от Pydantic BaseSettings для автоматической валидации и загрузки переменных окружения.
+    Наследуется от AppSettings.
     """
 
     # --- Настройки, читаемые из .env ---
@@ -18,13 +19,6 @@ class Settings(BaseSettings):
 
     # Настройки логирования
     LOG_LEVEL: str = Field(default="INFO", description="Уровень логирования")
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,  # Имена переменных окружения не чувствительны к регистру
-        extra="ignore",  # Игнорировать лишние переменные .env
-    )
 
 
 # Создаем глобальный экземпляр настроек

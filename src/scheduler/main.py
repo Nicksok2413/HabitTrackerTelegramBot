@@ -14,6 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from src.api.core.database import db
 from src.core_shared.logging_setup import setup_logger
+from src.core_shared.sentry_sdk_setup import setup_sentry
 from src.scheduler.config import settings
 from src.scheduler.tasks import daily_maintenance, schedule_reminders
 
@@ -23,6 +24,11 @@ log = setup_logger("SchedulerMain", log_level_override=settings.LOG_LEVEL)
 
 async def main() -> None:
     """Запуск сервиса планировщика."""
+
+    # Вызываем инициализацию Sentry, передавая настройки и название сервиса
+    if settings.SENTRY_DSN:
+        setup_sentry(settings, service_name="Scheduler")
+
     log.info("⏳ Запуск сервиса планировщика (Scheduler Service)...")
 
     # Инициализируем подключение к базе данных

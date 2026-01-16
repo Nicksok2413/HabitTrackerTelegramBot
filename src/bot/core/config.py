@@ -1,14 +1,15 @@
 """Конфигурация Телеграм-бота."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from src.core_shared.config import AppSettings
 
 
-class Settings(BaseSettings):
+class Settings(AppSettings):
     """
     Основные настройки бота.
 
-    Наследуется от Pydantic BaseSettings для автоматической валидации и загрузки переменных окружения.
+    Наследуется от AppSettings.
     """
 
     # --- Настройки Telegram ---
@@ -35,14 +36,6 @@ class Settings(BaseSettings):
         Пример: http://api:8000/api/v1
         """
         return f"{self.API_BASE_URL}/api/v1"
-
-    # Конфигурация Pydantic
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,  # Имена переменных окружения не чувствительны к регистру
-        extra="ignore",  # Игнорировать лишние переменные в .env
-    )
 
 
 # Создаем глобальный экземпляр настроек
