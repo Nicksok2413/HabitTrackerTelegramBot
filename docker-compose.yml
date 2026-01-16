@@ -14,7 +14,7 @@ x-api-base: &api-base-config
     - backend
 
 services:
-  # Сервис Базы данных
+  # Сервис базы данных (PostgreSQL)
   db:
     image: postgres:18-alpine
     container_name: habit_tracker_db
@@ -35,14 +35,33 @@ services:
     networks:
       - backend
 
+  # Redis (брокер сообщений)
+  redis:
+    image: redis:7-alpine
+    container_name: habit_tracker_redis
+    # Команда для персистентности (сохранять дамп БД каждые 60 сек, если было хотя бы 1 изменение)
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data  # Монтируем том для сохранения dump.rdb
+    healthcheck:
+      # Проверяет, отвечает ли Redis на команду PING
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s  # Даем время на запуск Redis перед первой проверкой
+    restart: unless-stopped
+    networks:
+      - backend
+
   # Сервис API
   api:
     <<: *api-base-config
     container_name: habit_tracker_api
     # Команда для "продакшен" запуска (будет передана в entrypoint как "$@")
     command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-    # Проверяет, готов ли api принимать запросы
     healthcheck:
+      # Проверяет, готов ли api принимать запросы
       test: [ "CMD", "curl", "-f", "http://0.0.0.0:8000/healthcheck" ]
       interval: 5s
       timeout: 5s
@@ -59,7 +78,7 @@ services:
     command: python -m alembic -c pyproject.toml upgrade head
     restart: "no"
 
-  # Сервис Телеграм-бота
+  # Сервис телеграм-бота
   bot:
     build:
       context: .  # Контекст сборки - корень проекта
@@ -78,7 +97,7 @@ services:
     networks:
       - backend
 
-  # Сервис Планировщика
+  # Сервис планировщика
   scheduler:
     build:
       context: .  # Контекст сборки - корень проекта
@@ -93,6 +112,29 @@ services:
     depends_on:
       db:
         condition: service_healthy  # Запускаем только после того, как db станет healthy
+      redis:
+        condition: service_healthy  # Ждем Redis, так как туда отправляются задачи
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Воркер (Celery)
+  worker:
+    build:
+      context: .  # Контекст сборки - корень проекта
+      dockerfile: docker/Dockerfile  # Путь к общему Dockerfile
+      target: worker  # Этап №6 'worker'
+    container_name: habit_tracker_worker
+    # Команда для запуска воркера (будет передана в entrypoint как "$@")
+    command: celery -A src.worker.celery_app worker -l info -c 2
+    env_file: .env  # Передаем все переменные из .env в контейнер
+    volumes:
+      - worker_logs:/logs  # Монтируем том для логов
+    depends_on:
+      db:
+        condition: service_healthy  # Запускаем только после того, как db станет healthy
+      redis:
+        condition: service_healthy  # Запускаем только после того, как redis станет healthy
     restart: unless-stopped
     networks:
       - backend
@@ -101,11 +143,15 @@ services:
 volumes:
   postgres_data:
     driver: local
+  redis_data:
+    driver: local
   api_logs:
     driver: local
   bot_logs:
     driver: local
   scheduler_logs:
+    driver: local
+  worker_logs:
     driver: local
 
 # Определяем общую сеть для всех сервисов.
