@@ -1,0 +1,25 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# Файл, где Promtail хранит "закладки" (до какой строки он дочитал лог) чтобы не дублировать логи при перезапуске
+positions:
+  filename: /tmp/positions.yaml
+
+# Куда отправлять логи
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    # Используем Docker service discovery для автоматического поиска контейнеров
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    # Правила обработки меток (превращаем ID контейнера в читаемое имя)
+    relabel_configs:
+      # Берем имя контейнера из метаданных Docker
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'  # Отсекаем начальный слэш (например, /habit_tracker_api -> habit_tracker_api)
+        target_label: 'container'  # Записываем в метку 'container'

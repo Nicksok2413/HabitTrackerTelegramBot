@@ -1,0 +1,29 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks  # Где хранить данные
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory  # Храним состояние кольца в памяти
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem  # Храним данные на диске (в docker volume)
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+# Настройка аналитики (необязательно, отключаем отсылку статистики разрабам Loki)
+analytics:
+  reporting_enabled: false
