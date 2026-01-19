@@ -2,8 +2,10 @@ auth_enabled: false
 
 server:
   http_listen_port: 3100
+  grpc_listen_port: 9096
 
 common:
+  instance_addr: 127.0.0.1
   path_prefix: /loki
   storage:
     filesystem:
@@ -16,13 +18,23 @@ common:
 
 schema_config:
   configs:
-    - from: 2020-10-24
-      store: boltdb-shipper
+    - from: 2024-01-01
+      store: tsdb
       object_store: filesystem  # Храним данные на диске (в docker volume)
-      schema: v11
+      schema: v13
       index:
         prefix: index_
         period: 24h
+
+# Разрешаем прием логов без timestamp (иногда полезно для Docker)
+limits_config:
+  allow_structured_metadata: true
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 336h
 
 # Настройка аналитики (необязательно, отключаем отсылку статистики разрабам Loki)
 analytics:

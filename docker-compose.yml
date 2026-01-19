@@ -69,7 +69,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s  # Даем время на запуск api перед первой проверкой
+      start_period: 5s  # Даем время на запуск api перед первой проверкой
     restart: unless-stopped
 
   # Сервис миграций
@@ -216,8 +216,8 @@ services:
   celery-exporter:
     image: danihodovic/celery-exporter:latest
     container_name: monitoring_celery_exporter
-    environment:
-      CELERY_BROKER_URL: ${REDIS_URL:-redis://redis:6379/0}  # redis://redis:6379/0 - по умолчанию
+    # Передаем URL брокера явно через флаг команды
+    command: --broker-url=${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     networks:
       - backend
