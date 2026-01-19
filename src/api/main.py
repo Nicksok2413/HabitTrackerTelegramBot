@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, Response, status
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 
 from src.api.core.config import settings
@@ -86,6 +87,9 @@ def create_app() -> FastAPI:
 
 # Создаем основной экземпляр приложения
 app = create_app()
+
+# Инициализируем метрики (создаем эндпоинт /metrics, который будет скрапить Prometheus)
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get(
