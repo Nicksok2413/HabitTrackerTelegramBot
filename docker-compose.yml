@@ -66,7 +66,7 @@ services:
     healthcheck:
       # Проверяет, готов ли api принимать запросы
       test: [ "CMD", "curl", "-f", "http://localhost:8000/healthcheck" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s  # Даем время на запуск api перед первой проверкой
@@ -217,7 +217,7 @@ services:
     image: danihodovic/celery-exporter:latest
     container_name: monitoring_celery_exporter
     # Передаем URL брокера явно через флаг команды
-    command: --broker-url=${REDIS_URL:-redis://redis:6379/0}
+    command: --broker-url=${REDIS_URL}
     restart: unless-stopped
     networks:
       - backend
