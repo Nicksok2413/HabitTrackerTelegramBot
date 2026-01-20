@@ -1,9 +1,9 @@
+from datetime import datetime, time
+
 import pytest
-from datetime import time, datetime
-from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.models import User, Habit
+from src.api.models import Habit, User
 from src.api.repositories import HabitRepository
 
 # Помечаем все тесты в модуле как асинхронные

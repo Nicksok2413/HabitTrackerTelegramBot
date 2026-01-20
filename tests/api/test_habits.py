@@ -1,8 +1,8 @@
 import pytest
 from httpx import AsyncClient
-from starlette import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 
 from src.api.models import Habit, User
 

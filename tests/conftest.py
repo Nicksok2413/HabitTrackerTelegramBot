@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from src.api.core.config import settings
 from src.api.core.security import create_access_token
 from src.api.models import User
-from src.api.schemas import UserSchemaCreate
 from src.api.repositories import UserRepository
+from src.api.schemas import UserSchemaCreate
 
 # URL тестовой базы данных
 # Внимание: значения должны совпадать с теми, что в pyproject.toml
