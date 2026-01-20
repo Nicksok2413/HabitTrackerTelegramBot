@@ -45,10 +45,7 @@ async def test_get_habits_for_notification(db_session: AsyncSession):
     dummy_date = datetime.now().date()
 
     habits = await repo.get_habits_for_notification(
-        db_session,
-        timezone="Asia/Yekaterinburg",
-        target_time=target_time,
-        target_date=dummy_date
+        db_session, timezone="Asia/Yekaterinburg", target_time=target_time, target_date=dummy_date
     )
 
     assert len(habits) == 1
@@ -59,7 +56,7 @@ async def test_get_habits_for_notification(db_session: AsyncSession):
         db_session,
         timezone="Asia/Yekaterinburg",
         target_time=time(10, 0),  # Другое время
-        target_date=dummy_date
+        target_date=dummy_date,
     )
 
     assert len(habits_wrong_time) == 0
@@ -69,7 +66,7 @@ async def test_get_habits_for_notification(db_session: AsyncSession):
         db_session,
         timezone="Europe/Moscow",  # Другая зона
         target_time=target_time,
-        target_date=dummy_date
+        target_date=dummy_date,
     )
 
     assert len(habits_wrong_tz) == 0

@@ -10,11 +10,7 @@ from src.api.models import Habit, User
 pytestmark = pytest.mark.asyncio
 
 
-async def test_create_habit(
-        test_client: AsyncClient,
-        user_auth_headers: dict[str, str],
-        db_session: AsyncSession
-):
+async def test_create_habit(test_client: AsyncClient, user_auth_headers: dict[str, str], db_session: AsyncSession):
     """Тест создания новой привычки."""
     payload = {
         "name": "Drink Water",
@@ -79,10 +75,10 @@ async def test_delete_habit(test_client: AsyncClient, user_auth_headers: dict[st
 
 
 async def test_security_cannot_delete_others_habit(
-        test_client: AsyncClient,
-        user_auth_headers: dict[str, str],
-        another_user: User,  # фикстура другого юзера
-        db_session: AsyncSession
+    test_client: AsyncClient,
+    user_auth_headers: dict[str, str],
+    another_user: User,  # фикстура другого юзера
+    db_session: AsyncSession,
 ):
     """
     Security Test: Пользователь А не может удалить привычку Пользователя Б.

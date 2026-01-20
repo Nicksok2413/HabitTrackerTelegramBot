@@ -25,9 +25,7 @@ async def test_mark_habit_done_and_check_streak(test_client: AsyncClient, user_a
 
     # Выполняем (DONE)
     execution_response = await test_client.post(
-        f"/api/v1/habits/{habit_id}/executions/",
-        json={"status": "done"},
-        headers=user_auth_headers
+        f"/api/v1/habits/{habit_id}/executions/", json={"status": "done"}, headers=user_auth_headers
     )
 
     assert execution_response.status_code == status.HTTP_201_CREATED
@@ -40,9 +38,7 @@ async def test_mark_habit_done_and_check_streak(test_client: AsyncClient, user_a
 
     # Отменяем (PENDING) - в API мы шлем статус pending для отмены
     await test_client.post(
-        f"/api/v1/habits/{habit_id}/executions/",
-        json={"status": "pending"},
-        headers=user_auth_headers
+        f"/api/v1/habits/{habit_id}/executions/", json={"status": "pending"}, headers=user_auth_headers
     )
 
     # Проверяем привычку (стрик должен стать 0)
@@ -64,18 +60,10 @@ async def test_streak_calculation_idempotency(test_client: AsyncClient, user_aut
     habit_id = response.json()["id"]
 
     # Выполняем 1 раз
-    await test_client.post(
-        f"/api/v1/habits/{habit_id}/executions/",
-        json={"status": "done"},
-        headers=user_auth_headers
-    )
+    await test_client.post(f"/api/v1/habits/{habit_id}/executions/", json={"status": "done"}, headers=user_auth_headers)
 
     # Выполняем 2 раз (тот же статус)
-    await test_client.post(
-        f"/api/v1/habits/{habit_id}/executions/",
-        json={"status": "done"},
-        headers=user_auth_headers
-    )
+    await test_client.post(f"/api/v1/habits/{habit_id}/executions/", json={"status": "done"}, headers=user_auth_headers)
 
     # Стрик всё равно должен быть 1
     habit_response = await test_client.get(f"/api/v1/habits/{habit_id}", headers=user_auth_headers)
