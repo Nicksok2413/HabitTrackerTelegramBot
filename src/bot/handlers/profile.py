@@ -93,7 +93,7 @@ async def start_timezone_change(callback: CallbackQuery, state: FSMContext) -> N
     await state.set_state(ProfileEdit.waiting_for_timezone)
 
 
-@router.message(ProfileEdit.waiting_for_timezone)
+@router.message(ProfileEdit.waiting_for_timezone, ~F.text.startswith("/"))
 async def process_timezone_input(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Обработка введенного текста часового пояса.
