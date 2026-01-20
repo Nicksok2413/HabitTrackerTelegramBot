@@ -539,7 +539,7 @@ async def start_habit_creation(message: Message, state: FSMContext) -> None:
 # --- Получение названия ---
 
 
-@router.message(HabitCreation.waiting_for_name)
+@router.message(HabitCreation.waiting_for_name, ~F.text.startswith("/"))
 async def process_habit_name(message: Message, state: FSMContext) -> None:
     """
     Принимает название привычки.
@@ -577,7 +577,7 @@ async def process_habit_name(message: Message, state: FSMContext) -> None:
 # --- Получение описания ---
 
 
-@router.message(HabitCreation.waiting_for_description)
+@router.message(HabitCreation.waiting_for_description, ~F.text.startswith("/"))
 async def process_habit_description(message: Message, state: FSMContext) -> None:
     """
     Принимает описание привычки.
@@ -614,7 +614,7 @@ async def process_habit_description(message: Message, state: FSMContext) -> None
 
 
 # --- Получение цели (количества дней) ---
-@router.message(HabitCreation.waiting_for_target_days)
+@router.message(HabitCreation.waiting_for_target_days, ~F.text.startswith("/"))
 async def process_habit_target_days(message: Message, state: FSMContext) -> None:
     """
     Принимает цель (количество дней) для формирования привычки.
@@ -660,7 +660,7 @@ async def process_habit_target_days(message: Message, state: FSMContext) -> None
 # --- Получение времени и сохранение ---
 
 
-@router.message(HabitCreation.waiting_for_time)
+@router.message(HabitCreation.waiting_for_time, ~F.text.startswith("/"))
 async def process_habit_time(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Принимает время, валидирует его и отправляет запрос на создание привычки в API.
@@ -875,7 +875,7 @@ async def start_editing_field(callback: CallbackQuery, callback_data: HabitActio
 
 
 # --- Обработка ввода нового названия ---
-@router.message(HabitEditing.waiting_for_new_name)
+@router.message(HabitEditing.waiting_for_new_name, ~F.text.startswith("/"))
 async def process_habit_new_name(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Принимает новое название привычки.
@@ -906,7 +906,7 @@ async def process_habit_new_name(message: Message, state: FSMContext, api_client
 
 
 # --- Обработка ввода нового описания ---
-@router.message(HabitEditing.waiting_for_new_description)
+@router.message(HabitEditing.waiting_for_new_description, ~F.text.startswith("/"))
 async def process_habit_new_description(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Принимает новое описание привычки.
@@ -938,7 +938,7 @@ async def process_habit_new_description(message: Message, state: FSMContext, api
 
 
 # --- Обработка ввода новой цели (количества дней) ---
-@router.message(HabitEditing.waiting_for_new_target_days)
+@router.message(HabitEditing.waiting_for_new_target_days, ~F.text.startswith("/"))
 async def process_habit_new_target_days(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Принимает новую цель (количество дней) для формирования привычки.
@@ -974,7 +974,7 @@ async def process_habit_new_target_days(message: Message, state: FSMContext, api
 
 
 # --- Обработка ввода нового времени оповещения ---
-@router.message(HabitEditing.waiting_for_new_time)
+@router.message(HabitEditing.waiting_for_new_time, ~F.text.startswith("/"))
 async def process_habit_new_time(message: Message, state: FSMContext, api_client: HabitTrackerClient) -> None:
     """
     Принимает новое время оповещения.

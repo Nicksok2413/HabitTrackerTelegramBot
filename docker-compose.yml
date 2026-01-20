@@ -14,6 +14,9 @@ x-api-base: &api-base-config
     - backend
 
 services:
+
+  # --- APP STACK ---
+
   # Сервис базы данных (PostgreSQL)
   db:
     image: postgres:18-alpine
@@ -62,8 +65,8 @@ services:
     command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       # Проверяет, готов ли api принимать запросы
-      test: [ "CMD", "curl", "-f", "http://0.0.0.0:8000/healthcheck" ]
-      interval: 5s
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/healthcheck" ]
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s  # Даем время на запуск api перед первой проверкой
@@ -92,7 +95,7 @@ services:
       - bot_logs:/logs  # Монтируем том для логов
     depends_on:
       api:
-        condition: service_healthy # Запускаем только после того, как api станет healthy
+        condition: service_healthy  # Запускаем только после того, как api станет healthy
     restart: unless-stopped
     networks:
       - backend
@@ -139,6 +142,86 @@ services:
     networks:
       - backend
 
+  # --- MONITORING STACK ---
+
+  # Prometheus (сбор метрик)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: monitoring_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro  # Монтируем конфиг (только для чтения)
+      - prometheus_data:/prometheus  # Монтируем том для хранения собранных метрик
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'  # Передаем путь к конфигу
+      - '--storage.tsdb.retention.time=15d' # Хранить 15 дней
+      - '--web.enable-lifecycle'  # Разрешаем перезагрузку конфига "на лету", без необходимости перезапускать контейнер
+    depends_on:
+      api:
+        condition: service_healthy  # Запускаем только после того, как api станет healthy
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Loki (сбор логов)
+  loki:
+    image: grafana/loki:3.6.3
+    container_name: monitoring_loki
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro  # Монтируем конфиг (только для чтения)
+      - loki_data:/loki  # Монтируем том для хранения собранных логов
+    command: -config.file=/etc/loki/local-config.yaml  # Передаем путь к конфигу
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Promtail (агент для отправки логов в Loki)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: monitoring_promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Читаем логи хоста
+      - /var/run/docker.sock:/var/run/docker.sock  # Для обнаружения контейнеров
+      - ./monitoring/promtail-config.yaml:/etc/promtail/config.yaml:ro  # Монтируем конфиг (только для чтения)
+    command: -config.file=/etc/promtail/config.yaml  # Передаем путь к конфигу
+    depends_on:
+      loki:
+        condition: service_started  # Запускаем Promtail после loki
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Grafana (визуализация)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monitoring_grafana
+    volumes:
+      - grafana_data:/var/lib/grafana  # Монтируем том для хранения данных Grafana (настройки, пользователи, дашборды)
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}  # admin - по умолчанию
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}  # admin - по умолчанию
+      GF_USERS_ALLOW_SIGN_UP: "false"  # Отключить регистрацию новых пользователей
+    ports:
+      - "3000:3000"  # Пробрасываем порт для доступа к UI Grafana
+    depends_on:
+      prometheus:
+        condition: service_started  # Запускаем Grafana после prometheus
+      loki:
+        condition: service_started  # Запускаем Grafana после loki
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Celery Exporter (метрики фоновых задач)
+  # Это "Sidecar" контейнер, который слушает Redis и отдает метрики для Prometheus
+  celery-exporter:
+    image: danihodovic/celery-exporter:latest
+    container_name: monitoring_celery_exporter
+    # Передаем URL брокера явно через флаг команды
+    command: --broker-url=${REDIS_URL}
+    restart: unless-stopped
+    networks:
+      - backend
+
 # Определяем все тома для хранения персистентных данных
 volumes:
   postgres_data:
@@ -152,6 +235,12 @@ volumes:
   scheduler_logs:
     driver: local
   worker_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
     driver: local
 
 # Определяем общую сеть для всех сервисов.
