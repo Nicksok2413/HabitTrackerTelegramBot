@@ -7,12 +7,17 @@ import pytest_asyncio
 from alembic import command
 from alembic.config import Config
 from pytest_docker.plugin import Services as DockerServices
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from src.api.core.config import settings
+from src.api.core.security import create_access_token
+from src.api.models import User
+from src.api.schemas import UserSchemaCreate
+from src.api.repositories import UserRepository
 
 # URL тестовой базы данных
-# Внимание: значения должны совпадать с теми, что в docker-compose.test.yml и pyproject.toml
+# Внимание: значения должны совпадать с теми, что в pyproject.toml
 TEST_DATABASE_URL = "postgresql+psycopg://test_user:test_password@localhost:5433/test_db"
 
 
@@ -129,6 +134,49 @@ async def db_session(db_session_factory: async_sessionmaker[AsyncSession]) -> As
         try:
             # Передаем управление в тестовую функцию
             yield session
+            # После теста очищаем таблицы
+            # RESTART IDENTITY сбрасывает счетчики ID
+            await session.execute(text("TRUNCATE TABLE users, habits, habitexecutions RESTART IDENTITY CASCADE;"))
+            await session.commit()
         finally:
             # Гарантированно откатываем транзакцию после завершения теста, даже если в нем произошла ошибка
             await session.rollback()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def user(db_session: AsyncSession) -> User:
+    """Создает тестового пользователя в БД и возвращает его."""
+    repo = UserRepository(User)
+    user_in = UserSchemaCreate(
+        telegram_id=123456789,
+        username="test_user",
+        first_name="Test",
+        last_name="User",
+        timezone="UTC",
+    )
+    # Используем репозиторий напрямую для скорости
+    user = await repo.create(db_session, obj_in=user_in)
+    return user
+
+
+@pytest_asyncio.fixture(scope="function")
+async def user_auth_headers(user: User) -> dict[str, str]:
+    """Генерирует заголовки авторизации (Bearer Token) для тестового пользователя."""
+    access_token = create_access_token(data={"user_id": user.id})
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+@pytest_asyncio.fixture(scope="function")
+async def another_user(db_session: AsyncSession) -> User:
+    """Создает второго тестового пользователя в БД и возвращает его (для тестов безопасности/изоляции)."""
+    repo = UserRepository(User)
+    user_in = UserSchemaCreate(
+        telegram_id=987654321,
+        username="test_user2",
+        first_name="Test2",
+        last_name="User2",
+        timezone="UTC",
+    )
+
+    user = await repo.create(db_session, obj_in=user_in)
+    return user
