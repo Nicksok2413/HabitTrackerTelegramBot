@@ -1,5 +1,5 @@
 services:
-  # Изолированный сервис Базы данных для тестов
+  # Изолированный сервис базы данных для тестов
   test-db:
     image: postgres:18-alpine
     container_name: habit_tracker_test_db_isolated
