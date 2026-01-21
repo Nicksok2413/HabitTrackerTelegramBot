@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from httpx import AsyncClient
 from starlette import status
@@ -32,20 +34,50 @@ async def test_mark_habit_done_and_check_streak(test_client: AsyncClient, user_a
 
     # Проверяем привычку (стрик должен стать 1)
     habit_response = await test_client.get(f"/api/v1/habits/{habit_id}", headers=user_auth_headers)
+    habit = habit_response.json()
 
-    assert habit_response.json()["current_streak"] == 1
-    assert habit_response.json()["is_done_today"] is True
+    assert habit["current_streak"] == 1
 
-    # Отменяем (PENDING) - в API мы шлем статус pending для отмены
+    # Проверяем список выполнений
+    executions = habit.get("executions", [])
+    assert len(executions) > 0
+
+    # Ищем DONE за сегодня
+    is_done_today = any(
+        execution["execution_date"] == date.today().isoformat() and execution["status"] == "done"
+        for execution in executions
+    )
+
+    assert is_done_today is True
+
+    # Отменяем (PENDING)
     await test_client.post(
         f"/api/v1/habits/{habit_id}/executions/", json={"status": "pending"}, headers=user_auth_headers
     )
 
     # Проверяем привычку (стрик должен стать 0)
     habit_response = await test_client.get(f"/api/v1/habits/{habit_id}", headers=user_auth_headers)
+    habit = habit_response.json()
 
-    assert habit_response.json()["current_streak"] == 0
-    assert habit_response.json()["is_done_today"] is False
+    assert habit["current_streak"] == 0
+
+    executions = habit.get("executions", [])
+
+    # Ищем DONE за сегодня
+    is_done_today = any(
+        execution["execution_date"] == date.today().isoformat() and execution["status"] == "done"
+        for execution in executions
+    )
+
+    assert is_done_today is False
+
+    # Ищем PENDING за сегодня
+    is_pending_today = any(
+        execution["execution_date"] == date.today().isoformat() and execution["status"] == "pending"
+        for execution in executions
+    )
+
+    assert is_pending_today is True
 
 
 async def test_streak_calculation_idempotency(test_client: AsyncClient, user_auth_headers: dict[str, str]):
