@@ -212,7 +212,7 @@
 │
 ├── tests/                  # Тесты (Pytest)
 ├── docker-compose.yml      # Prod config (Secure, closed ports)
-├── docker-compose.test.yml # CI config (CI)
+├── docker-compose.test.yml # Tests config (CI)
 ├── Makefile                # Shortcuts
 ├── poetry.lock             # Фиксация версий зависимостей
 └── pyproject.toml          # Зависимости и настройки проекта
