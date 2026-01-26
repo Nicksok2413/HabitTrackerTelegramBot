@@ -1,7 +1,7 @@
 # Makefile - Единая точка входа для управления проектом
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install up down rebuild prune logs migrate revision lint format types test test-cov check
+.PHONY: help install up down rebuild prune logs migrate revision lint lint-fix format-check format types test test-cov check check-all
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -19,6 +19,10 @@ help:
 	@echo "  prune          - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
 	@echo "  logs           - Показать логи всех сервисов"
 	@echo ""
+	@echo "Управление миграциями базы данных:"
+	@echo "  migrate        - Применить миграции Alembic"
+	@echo "  revision       - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
+	@echo ""
 	@echo "Проверка качества кода и тесты:"
 	@echo "  lint           - Проверить код линтером Ruff"
 	@echo "  lint-fix       - Исправить код линтером Ruff"
@@ -29,11 +33,6 @@ help:
 	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
 	@echo "  check          - Запустить статический анализ (lint, format-check, types) последовательно"
 	@echo "  check-all      - Запустить все проверки (lint, format-check, types, test) последовательно"
-	@echo ""
-	@echo "Управление миграциями базы данных:"
-	@echo "  migrate        - Применить миграции Alembic"
-	@echo "  revision       - Создать новый файл миграции Alembic. Пример: make revision m=\"Add user table\""
-
 
 # ------------------------------------------------------------------------------
 # Установка зависимостей
@@ -75,6 +74,29 @@ logs:
 	docker compose logs -f
 
 # ------------------------------------------------------------------------------
+# Управление миграциями БД
+# ------------------------------------------------------------------------------
+migrate:
+	@echo "-> Применение миграций Alembic..."
+	# Запускаем временный контейнер api-migrate
+	docker compose run --rm api-migrate
+	@echo "-> Миграции успешно применены."
+
+revision:
+	# Проверяем, что передано сообщение для миграции
+	@if [ -z "$(m)" ]; then \
+		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
+		exit 1; \
+	fi
+
+	@echo "-> Создание новой миграции..."
+	docker compose run --rm api-migrate python -m alembic -c pyproject.toml revision --autogenerate -m "$(m)"
+	@echo "-> Миграция успешно создана."
+	@echo "-> Форматирование новой миграции..."
+	make format
+	@echo "-> Готово."
+
+# ------------------------------------------------------------------------------
 # Проверка качества кода и тесты
 # ------------------------------------------------------------------------------
 lint:
@@ -110,26 +132,3 @@ check: lint format-check types
 
 check-all: lint format-check types test
 	@echo "-> Все проверки (включая тесты) успешно пройдены!"
-
-# ------------------------------------------------------------------------------
-# Управление миграциями БД
-# ------------------------------------------------------------------------------
-migrate:
-	@echo "-> Применение миграций Alembic..."
-	# Запускаем временный контейнер api-migrate
-	docker compose run --rm api-migrate
-	@echo "-> Миграции успешно применены."
-
-revision:
-	# Проверяем, что передано сообщение для миграции
-	@if [ -z "$(m)" ]; then \
-		echo "Ошибка: необходимо указать сообщение для миграции. Пример: make revision m=\"Your message\""; \
-		exit 1; \
-	fi
-
-	@echo "-> Создание новой миграции..."
-	docker compose run --rm api-migrate python -m alembic -c pyproject.toml revision --autogenerate -m "$(m)"
-	@echo "-> Миграция успешно создана."
-	@echo "-> Форматирование новой миграции..."
-	make format
-	@echo "-> Готово."
