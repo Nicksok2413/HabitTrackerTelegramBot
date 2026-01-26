@@ -86,7 +86,7 @@ lint-fix:
 	poetry run ruff check . --fix
 
 format-check:
-	@echo "-> Форматирование кода с помощью Ruff formatter..."
+	@echo "-> Проверка кода с помощью Ruff formatter..."
 	poetry run ruff format . --check
 
 format:
