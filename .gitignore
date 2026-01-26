@@ -72,12 +72,6 @@ dmypy.json
 celerybeat-schedule
 *.pid
 
-# === PDM ===
-.pdm-build/
-.pdm-python
-.pdm.toml
-__pypackages__/
-
 # === Docker ===
 docker-compose.override.yml
 docker-compose.local.yml
