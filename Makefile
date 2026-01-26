@@ -52,7 +52,7 @@ up:
 down:
 	docker compose down
 
-rebuild: down
+rebuild:
 	@echo "-> Пересборка и запуск сервисов..."
 	docker compose up -d --build
 	@echo "-> Сервисы успешно пересобраны и запущены."
