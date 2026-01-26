@@ -4,7 +4,7 @@
 [project]
 name = "HabitTrackerTelegramBot"
 version = "0.1.0"
-description = ""
+description = "A productivity Telegram bot that helps users track daily habits and sends reminders."
 authors = [
     {name = "Mikalai Sakalouski",email = "nicksok2413@gmail.com"}
 ]
